@@ -110,3 +110,28 @@ class ParticipantResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ─── Message Schemas ──────────────────────────────────────────
+
+class MessageCreate(BaseModel):
+    sender_name: str
+    text: str
+
+
+class MessageResponse(BaseModel):
+    id: int
+    meeting_id: int
+    sender_name: str
+    text: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Reaction Schema ──────────────────────────────────────────
+
+class ReactionCreate(BaseModel):
+    emoji: str
+    sender_name: str
