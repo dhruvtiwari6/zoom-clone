@@ -34,6 +34,7 @@ class MeetingSchedule(BaseModel):
     host_id: int = 1
     scheduled_at: datetime
     duration_minutes: int = Field(default=60, ge=15, le=1440)
+    passcode: Optional[str] = None
 
 
 class MeetingUpdate(BaseModel):

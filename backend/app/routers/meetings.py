@@ -128,7 +128,7 @@ async def schedule_meeting(
             "scheduled_at": data.scheduled_at,
             "duration_minutes": data.duration_minutes,
             "invite_link": invite_link,
-            "passcode": generate_passcode(),
+            "passcode": data.passcode if (data.passcode and len(data.passcode.strip()) > 0) else generate_passcode(),
         },
         include={"host": True, "participants": True},
     )
