@@ -65,9 +65,23 @@ async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
     await manager.connect(meeting_id, websocket)
     try:
         while True:
-            # Keep the connection open; clients send 'ping' heartbeats
-            text = await websocket.receive_text()
-            if text == "ping":
-                await websocket.send_text("pong")
+            # We can receive either plain text ("ping") or JSON (WebRTC signaling)
+            data = await websocket.receive_json()
+            if isinstance(data, dict):
+                # If it's a signaling or reaction message, broadcast it to the room
+                # (but avoid sending it back to the sender if we want, or just broadcast to everyone)
+                await manager.broadcast(meeting_id, data)
+            elif data == "ping":
+                await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
+        manager.disconnect(meeting_id, websocket)
+    except Exception:
+        # Fallback to text handler if json parsing fails
+        try:
+            while True:
+                text = await websocket.receive_text()
+                if text == "ping":
+                    await websocket.send_text("pong")
+        except Exception:
+            pass
         manager.disconnect(meeting_id, websocket)
