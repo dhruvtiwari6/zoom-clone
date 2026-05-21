@@ -24,12 +24,14 @@ class ConnectionManager:
             if not self.rooms[meeting_id]:
                 del self.rooms[meeting_id]
 
-    async def broadcast(self, meeting_id: str, message: dict):
-        """Send a JSON message to every client in the meeting room."""
+    async def broadcast(self, meeting_id: str, message: dict, exclude: WebSocket = None):
+        """Send a JSON message to every client in the meeting room, optionally excluding one."""
         if meeting_id not in self.rooms:
             return
         dead: List[WebSocket] = []
         for ws in list(self.rooms[meeting_id]):
+            if exclude and ws == exclude:
+                continue
             try:
                 await ws.send_json(message)
             except Exception:

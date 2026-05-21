@@ -56,32 +56,28 @@ async def health_check():
 async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
     """
     WebSocket endpoint — one connection per participant per meeting.
-    Clients connect here and receive real-time JSON events:
-      { type: 'participants', data: [...] }
-      { type: 'new_message',  data: {...} }
-      { type: 'meeting_ended' }
-    The server accepts 'ping' text frames to keep the connection alive.
+    Clients connect here and receive real-time JSON events.
+    Handles heartbeat 'ping' frames and WebRTC json payloads in a single robust loop.
     """
     await manager.connect(meeting_id, websocket)
     try:
+        import json
         while True:
-            # We can receive either plain text ("ping") or JSON (WebRTC signaling)
-            data = await websocket.receive_json()
-            if isinstance(data, dict):
-                # If it's a signaling or reaction message, broadcast it to the room
-                # (but avoid sending it back to the sender if we want, or just broadcast to everyone)
-                await manager.broadcast(meeting_id, data)
-            elif data == "ping":
-                await websocket.send_json({"type": "pong"})
+            # Receive frame as plain text to safely distinguish between ping and json payloads
+            message = await websocket.receive_text()
+            if message == "ping":
+                await websocket.send_text("pong")
+                continue
+
+            # Parse WebRTC JSON signaling / reaction messages
+            try:
+                data = json.loads(message)
+                if isinstance(data, dict):
+                    await manager.broadcast(meeting_id, data, exclude=websocket)
+            except json.JSONDecodeError:
+                pass
     except WebSocketDisconnect:
         manager.disconnect(meeting_id, websocket)
-    except Exception:
-        # Fallback to text handler if json parsing fails
-        try:
-            while True:
-                text = await websocket.receive_text()
-                if text == "ping":
-                    await websocket.send_text("pong")
-        except Exception:
-            pass
+    except Exception as e:
+        print(f"[WS Endpoint Error] {e}")
         manager.disconnect(meeting_id, websocket)
