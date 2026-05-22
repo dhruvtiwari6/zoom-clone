@@ -1285,8 +1285,8 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
               <div className="invite-row">
                 <div className="invite-label">Invite Link</div>
                 <div className="invite-value" style={{ flexDirection:'column', alignItems:'flex-start', gap:8 }}>
-                  <span style={{ fontSize:11, wordBreak:'break-all' }}>{meeting?.invite_link || `${typeof window!=='undefined'?window.location.origin:''}/meeting/${meetingId}`}</span>
-                  <button className={`invite-copy-btn ${copiedField==='link'?'copied':''}`} onClick={() => handleCopyInvite(meeting?.invite_link||`${window.location.origin}/meeting/${meetingId}`,'link')}>{copiedField==='link'?'✓ Copied':'Copy Link'}</button>
+                  <span style={{ fontSize:11, wordBreak:'break-all' }}>{meeting?.invite_link || `${typeof window!=='undefined'?window.location.origin:''}/meeting/${meetingId}?passcode=${meeting?.passcode || ''}`}</span>
+                  <button className={`invite-copy-btn ${copiedField==='link'?'copied':''}`} onClick={() => handleCopyInvite(meeting?.invite_link||`${window.location.origin}/meeting/${meetingId}?passcode=${meeting?.passcode || ''}`,'link')}>{copiedField==='link'?'✓ Copied':'Copy Link'}</button>
                 </div>
               </div>
             </div>

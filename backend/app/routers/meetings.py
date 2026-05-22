@@ -80,7 +80,8 @@ async def create_instant_meeting(
 ):
     """Create a new instant meeting."""
     mid = generate_meeting_id()
-    invite_link = f"{settings.FRONTEND_URL}/meeting/{mid}"
+    passcode = generate_passcode()
+    invite_link = f"{settings.FRONTEND_URL}/meeting/{mid}?passcode={passcode}"
 
     meeting = await db.meeting.create(
         data={
@@ -89,7 +90,7 @@ async def create_instant_meeting(
             "host_id": data.host_id,
             "status": "active",
             "invite_link": invite_link,
-            "passcode": generate_passcode(),
+            "passcode": passcode,
             "scheduled_at": datetime.now(timezone.utc),
             "duration_minutes": 60,
             "participants": {
@@ -116,7 +117,8 @@ async def schedule_meeting(
 ):
     """Schedule a future meeting."""
     mid = generate_meeting_id()
-    invite_link = f"{settings.FRONTEND_URL}/meeting/{mid}"
+    passcode = data.passcode if (data.passcode and len(data.passcode.strip()) > 0) else generate_passcode()
+    invite_link = f"{settings.FRONTEND_URL}/meeting/{mid}?passcode={passcode}"
 
     meeting = await db.meeting.create(
         data={
@@ -128,7 +130,7 @@ async def schedule_meeting(
             "scheduled_at": data.scheduled_at,
             "duration_minutes": data.duration_minutes,
             "invite_link": invite_link,
-            "passcode": data.passcode if (data.passcode and len(data.passcode.strip()) > 0) else generate_passcode(),
+            "passcode": passcode,
         },
         include={"host": True, "participants": True},
     )
