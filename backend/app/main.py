@@ -57,6 +57,9 @@ async def health_check():
 
 async def _cleanup_participant(participant_id: int, meeting_id_str: str):
     """Safely mark a participant as left in DB and broadcast updated list on abrupt disconnect."""
+    # If the participant has an active connection (e.g. they refreshed the page), do not mark them as left.
+    if manager.is_participant_connected(meeting_id_str, participant_id):
+        return
     try:
         # Mark participant as left
         await db.participant.update(
@@ -70,6 +73,21 @@ async def _cleanup_participant(participant_id: int, meeting_id_str: str):
             await _broadcast_participants(meeting.id, meeting_id_str, db)
     except Exception as e:
         print(f"[WS Disconnect Cleanup Error] {e}")
+
+
+async def _reactivate_participant(participant_id: int, meeting_id_str: str):
+    """Safely mark a participant as active again (clear left_at) in DB and broadcast updated list on reconnect."""
+    try:
+        await db.participant.update(
+            where={"id": participant_id},
+            data={"left_at": None}
+        )
+        meeting = await db.meeting.find_unique(where={"meeting_id": meeting_id_str})
+        if meeting:
+            from app.routes.participants import _broadcast_participants
+            await _broadcast_participants(meeting.id, meeting_id_str, db)
+    except Exception as e:
+        print(f"[WS Connect Reactivate Error] {e}")
 
 
 async def _schedule_meeting_expiration(meeting_id_str: str, delay_seconds: float):
@@ -98,7 +116,10 @@ async def websocket_endpoint(
     Clients connect here and receive real-time JSON events.
     Handles heartbeat 'ping' frames and WebRTC json payloads in a single robust loop.
     """
-    await manager.connect(meeting_id, websocket)
+    await manager.connect(meeting_id, websocket, participant_id)
+
+    if participant_id is not None:
+        await _reactivate_participant(participant_id, meeting_id)
 
     # Expiration checker: automatic meeting ending after its given defined duration
     try:
@@ -135,11 +156,11 @@ async def websocket_endpoint(
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
-        manager.disconnect(meeting_id, websocket)
+        manager.disconnect(meeting_id, websocket, participant_id)
         if participant_id is not None:
             await _cleanup_participant(participant_id, meeting_id)
     except Exception as e:
         print(f"[WS Endpoint Error] {e}")
-        manager.disconnect(meeting_id, websocket)
+        manager.disconnect(meeting_id, websocket, participant_id)
         if participant_id is not None:
             await _cleanup_participant(participant_id, meeting_id)
