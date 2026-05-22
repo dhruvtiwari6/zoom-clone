@@ -112,13 +112,13 @@ export default function Dashboard() {
     }
   };
 
-  const handleJoin = async (meetingId: string, displayName: string) => {
+  const handleJoin = async (meetingId: string, displayName: string, passcode: string) => {
     try {
       await api.getMeeting(meetingId);
-      await api.joinMeeting(meetingId, { display_name: displayName });
+      await api.joinMeeting(meetingId, { display_name: displayName, passcode: passcode });
     } catch {}
     setShowJoin(false);
-    router.push(`/meeting/${meetingId}?name=${encodeURIComponent(displayName)}`);
+    router.push(`/meeting/${meetingId}?name=${encodeURIComponent(displayName)}&passcode=${encodeURIComponent(passcode)}`);
   };
 
   const handleSchedule = async (data: { title: string; description: string; scheduled_at: string; duration_minutes: number }) => {
