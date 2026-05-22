@@ -146,11 +146,11 @@ export default function Dashboard() {
           onSchedule={() => setShowSchedule(true)} 
         />
 
-        {/* Blue Info calendar banner */}
+        {/* Google Calendar integration promo banner */}
         <div className="calendar-notice-banner">
-          <span className="material-symbols-outlined notice-icon">info</span>
+          <span className="material-symbols-outlined notice-icon" style={{ color: '#4285F4' }}>calendar_month</span>
           <span className="notice-text">
-            You haven't connected your calendar yet. <span className="connect-link">Connect now</span> to manage all your meetings and events in one place.
+            <strong>Google Calendar Sync Active:</strong> Easily sync your scheduled workspace meetings directly to your work or personal calendar with a single click.
           </span>
         </div>
 
