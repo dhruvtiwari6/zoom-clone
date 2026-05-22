@@ -14,6 +14,37 @@ interface FloatingReaction { id: number; emoji: string; x: number; }
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
 const REACTION_EMOJIS = ['👍','❤️','😂','🎉','👏','🤔','🙌','🔥'];
 
+function RemoteVideo({ stream, isVideoOn }: { stream: MediaStream; isVideoOn: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) {
+      if (el.srcObject !== stream) {
+        el.srcObject = stream;
+      }
+      el.play().catch(err => {
+        console.warn("[RemoteVideo] Play error:", err);
+      });
+    }
+  }, [stream]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        borderRadius: 'inherit',
+        display: isVideoOn ? 'block' : 'none'
+      }}
+    />
+  );
+}
+
 export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   const router = useRouter();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
@@ -121,19 +152,6 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     }
   }, [showChat]);
 
-  useEffect(() => {
-    Object.entries(remoteStreams).forEach(([pidStr, stream]) => {
-      const el = document.getElementById(`remote-video-${pidStr}`) as HTMLVideoElement;
-      if (el) {
-        if (el.srcObject !== stream) {
-          el.srcObject = stream;
-        }
-        el.play().catch(err => {
-          console.warn(`[WebRTC] Auto-play prevented for peer ${pidStr}:`, err);
-        });
-      }
-    });
-  }, [remoteStreams]);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -1047,23 +1065,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
                       ) : (
                         <>
                           {remoteStreams[p.id] && (
-                            <video
-                              id={`remote-video-${p.id}`}
-                              ref={(el) => {
-                                if (el && remoteStreams[p.id]) {
-                                  el.srcObject = remoteStreams[p.id];
-                                }
-                              }}
-                              autoPlay
-                              playsInline
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                borderRadius: 'inherit',
-                                display: p.is_video_on ? 'block' : 'none'
-                              }}
-                            />
+                            <RemoteVideo stream={remoteStreams[p.id]} isVideoOn={p.is_video_on} />
                           )}
                           {!p.is_video_on && (
                             <div className="avatar-circle">{getInitials(p.display_name)}</div>
@@ -1133,23 +1135,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
                   ) : (
                     <>
                       {remoteStreams[p.id] && (
-                        <video
-                          id={`remote-video-${p.id}`}
-                          ref={(el) => {
-                            if (el && remoteStreams[p.id]) {
-                              el.srcObject = remoteStreams[p.id];
-                            }
-                          }}
-                          autoPlay
-                          playsInline
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            borderRadius: 'inherit',
-                            display: p.is_video_on ? 'block' : 'none'
-                          }}
-                        />
+                        <RemoteVideo stream={remoteStreams[p.id]} isVideoOn={p.is_video_on} />
                       )}
                       {!p.is_video_on && (
                         <div className="avatar-circle">{getInitials(p.display_name)}</div>
