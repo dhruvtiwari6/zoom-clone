@@ -93,7 +93,7 @@ async def create_instant_meeting(
             "invite_link": invite_link,
             "passcode": passcode,
             "scheduled_at": datetime.now(timezone.utc),
-            "duration_minutes": 60,
+            "duration_minutes": 40,
             "participants": {
                 "create": [
                     {

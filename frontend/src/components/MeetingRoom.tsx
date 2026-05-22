@@ -423,7 +423,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
         setMeeting({
           id: 0, meeting_id: meetingId, title: 'Zoom Meeting', description: null,
           host_id: 1, status: 'active', scheduled_at: new Date().toISOString(),
-          duration_minutes: 60, invite_link: `${window.location.origin}/meeting/${meetingId}`,
+          duration_minutes: 40, invite_link: `${window.location.origin}/meeting/${meetingId}`,
           passcode: 'abc123', created_at: new Date().toISOString(), ended_at: null,
           host: null, participants: [],
         });

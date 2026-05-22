@@ -28,7 +28,7 @@ model Meeting {
   host_id          Int
   status           String   @default("scheduled") // "scheduled" | "active" | "ended"
   scheduled_at     DateTime?
-  duration_minutes Int      @default(60)
+  duration_minutes Int      @default(40)
   invite_link      String?
   passcode         String
   created_at       DateTime @default(now())

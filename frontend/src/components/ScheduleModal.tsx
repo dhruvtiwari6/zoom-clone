@@ -21,7 +21,7 @@ export default function ScheduleModal({ isOpen, onClose, onSchedule }: ScheduleM
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
-  const [duration, setDuration] = useState(60);
+  const [duration, setDuration] = useState(40);
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,6 +219,7 @@ export default function ScheduleModal({ isOpen, onClose, onSchedule }: ScheduleM
               <select id="schedule-duration" value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
                 <option value={15}>15 minutes</option>
                 <option value={30}>30 minutes</option>
+                <option value={40}>40 minutes</option>
                 <option value={45}>45 minutes</option>
                 <option value={60}>1 hour</option>
                 <option value={90}>1.5 hours</option>

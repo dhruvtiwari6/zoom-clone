@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import asyncio
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -71,6 +72,21 @@ async def _cleanup_participant(participant_id: int, meeting_id_str: str):
         print(f"[WS Disconnect Cleanup Error] {e}")
 
 
+async def _schedule_meeting_expiration(meeting_id_str: str, delay_seconds: float):
+    """Wait for the meeting duration to run out, then end the meeting and broadcast."""
+    await asyncio.sleep(delay_seconds)
+    try:
+        meeting = await db.meeting.find_unique(where={"meeting_id": meeting_id_str})
+        if meeting and meeting.status == "active":
+            await db.meeting.update(
+                where={"meeting_id": meeting_id_str},
+                data={"status": "ended", "ended_at": datetime.now(timezone.utc)}
+            )
+            await manager.broadcast(meeting_id_str, {"type": "meeting_ended"})
+    except Exception as e:
+        print(f"[Meeting Expiration Task Error] {e}")
+
+
 @app.websocket("/ws/{meeting_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
@@ -83,6 +99,25 @@ async def websocket_endpoint(
     Handles heartbeat 'ping' frames and WebRTC json payloads in a single robust loop.
     """
     await manager.connect(meeting_id, websocket)
+
+    # Expiration checker: automatic meeting ending after its given defined duration
+    try:
+        meeting = await db.meeting.find_unique(where={"meeting_id": meeting_id})
+        if meeting and meeting.status == "active" and meeting.scheduled_at:
+            now_utc = datetime.now(timezone.utc)
+            expiration = meeting.scheduled_at + timedelta(minutes=meeting.duration_minutes)
+            remaining = (expiration - now_utc).total_seconds()
+            if remaining <= 0:
+                # Already expired! End it now and broadcast.
+                await db.meeting.update(
+                    where={"meeting_id": meeting_id},
+                    data={"status": "ended", "ended_at": now_utc}
+                )
+                await manager.broadcast(meeting_id, {"type": "meeting_ended"})
+            else:
+                asyncio.create_task(_schedule_meeting_expiration(meeting_id, remaining))
+    except Exception as exp_err:
+        print(f"[Expiration Check Error] {exp_err}")
     try:
         import json
         while True:
