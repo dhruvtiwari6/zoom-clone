@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+from typing import Optional
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,8 +54,29 @@ async def health_check():
     return {"status": "healthy", "service": "zoom-clone-api"}
 
 
+async def _cleanup_participant(participant_id: int, meeting_id_str: str):
+    """Safely mark a participant as left in DB and broadcast updated list on abrupt disconnect."""
+    try:
+        # Mark participant as left
+        await db.participant.update(
+            where={"id": participant_id},
+            data={"left_at": datetime.now(timezone.utc)}
+        )
+        # Fetch the meeting DB ID to trigger the broadcast helper from participants route
+        meeting = await db.meeting.find_unique(where={"meeting_id": meeting_id_str})
+        if meeting:
+            from app.routes.participants import _broadcast_participants
+            await _broadcast_participants(meeting.id, meeting_id_str, db)
+    except Exception as e:
+        print(f"[WS Disconnect Cleanup Error] {e}")
+
+
 @app.websocket("/ws/{meeting_id}")
-async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    meeting_id: str,
+    participant_id: Optional[int] = None
+):
     """
     WebSocket endpoint — one connection per participant per meeting.
     Clients connect here and receive real-time JSON events.
@@ -78,6 +101,10 @@ async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
                 pass
     except WebSocketDisconnect:
         manager.disconnect(meeting_id, websocket)
+        if participant_id is not None:
+            await _cleanup_participant(participant_id, meeting_id)
     except Exception as e:
         print(f"[WS Endpoint Error] {e}")
         manager.disconnect(meeting_id, websocket)
+        if participant_id is not None:
+            await _cleanup_participant(participant_id, meeting_id)

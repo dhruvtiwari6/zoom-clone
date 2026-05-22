@@ -468,7 +468,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     initData();
 
     // 2. Open WebSocket
-    const ws = new WebSocket(`${WS_BASE}/ws/${meetingId}`);
+    const ws = new WebSocket(`${WS_BASE}/ws/${meetingId}?participant_id=${localParticipantId}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
