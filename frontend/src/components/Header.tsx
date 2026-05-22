@@ -23,9 +23,6 @@ export default function Header() {
 
       {/* Right controls */}
       <div className="header-right">
-        <button className="upgrade-btn">
-          Upgrade to Pro
-        </button>
         <div className="header-avatar" id="user-avatar">
           D
         </div>

@@ -51,6 +51,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   const [showReactionBar, setShowReactionBar] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -104,6 +105,21 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
   // Synchronize localPidRef immediately during render to prevent state updates timing out
   localPidRef.current = localParticipantId;
+
+  // Refs for asynchronous closures
+  const localDisplayNameRef = useRef<string>('');
+  const showChatRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    localDisplayNameRef.current = localDisplayName;
+  }, [localDisplayName]);
+
+  useEffect(() => {
+    showChatRef.current = showChat;
+    if (showChat) {
+      setUnreadMessagesCount(0);
+    }
+  }, [showChat]);
 
   useEffect(() => {
     Object.entries(remoteStreams).forEach(([pidStr, stream]) => {
@@ -442,6 +458,18 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           }
         } else if (msg.type === 'new_message') {
           const m = msg.data;
+          
+          // Toast notification and badge count if sent by someone else
+          const isFromMe = m.sender_name === localDisplayNameRef.current;
+          if (!isFromMe) {
+            const preview = m.text.length > 50 ? `${m.text.substring(0, 50)}...` : m.text;
+            showToast(`${m.sender_name}: "${preview}"`, 'info');
+            
+            if (!showChatRef.current) {
+              setUnreadMessagesCount(prev => prev + 1);
+            }
+          }
+
           setMessages(prev => {
             if (prev.some(x => x.id === m.id)) return prev;
             return [
@@ -1287,8 +1315,11 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           <div className="ctrl-label">Participants ({participants.length})</div>
         </button>
         <button className={`control-btn ${showChat ? 'active' : ''}`} onClick={() => { setShowChat(!showChat); setShowParticipants(false); setShowInvite(false); }}>
-          <div className="ctrl-icon">
+          <div className="ctrl-icon" style={{ position: 'relative' }}>
             <span className="material-symbols-outlined" style={{ fontVariationSettings: showChat ? "'FILL' 1" : "'FILL' 0" }}>chat</span>
+            {unreadMessagesCount > 0 && (
+              <span className="chat-badge">{unreadMessagesCount}</span>
+            )}
           </div>
           <div className="ctrl-label">Chat</div>
         </button>
