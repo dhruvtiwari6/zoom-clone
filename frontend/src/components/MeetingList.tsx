@@ -61,6 +61,38 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
     router.push(`/meeting/${meetingId}`);
   };
 
+  const getGoogleCalendarUrl = (m: Meeting) => {
+    if (!m.scheduled_at) return '#';
+    const start = new Date(m.scheduled_at);
+    const end = new Date(start.getTime() + m.duration_minutes * 60 * 1000);
+    
+    const formatToUTCString = (d: Date) => {
+      const year = d.getUTCFullYear();
+      const month = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+      const day = d.getUTCDate().toString().padStart(2, '0');
+      const hours = d.getUTCHours().toString().padStart(2, '0');
+      const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+      const seconds = d.getUTCSeconds().toString().padStart(2, '0');
+      return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+    };
+    
+    const dates = `${formatToUTCString(start)}/${formatToUTCString(end)}`;
+    
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const location = m.invite_link || `${origin}/meeting/${m.meeting_id}?passcode=${m.passcode || ''}`;
+    const details = `Join the Zoom meeting using the link below:\n${location}\n\nPasscode: ${m.passcode || 'None'}\n\n${m.description || ''}`.trim();
+    
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: m.title || 'Zoom Meeting',
+      dates: dates,
+      details: details,
+      location: location,
+    });
+    
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  };
+
   return (
     <div className="workplace-calendar-card">
       {/* Card Header controls */}
@@ -111,9 +143,42 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
                     Host: {m.host?.name || 'dhruv tiwari'}
                   </div>
                 </div>
-                <button className="btn-start-meeting" onClick={() => handleStart(m.meeting_id)}>
-                  Start
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <a 
+                    className="btn-add-calendar" 
+                    href={getGoogleCalendarUrl(m)} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    title="Add to Google Calendar"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: 'var(--zoom-text-secondary)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.color = '#fff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                      e.currentTarget.style.color = 'var(--zoom-text-secondary)';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>calendar_month</span>
+                  </a>
+                  <button className="btn-start-meeting" onClick={() => handleStart(m.meeting_id)}>
+                    Start
+                  </button>
+                </div>
               </div>
             ))
           ) : (

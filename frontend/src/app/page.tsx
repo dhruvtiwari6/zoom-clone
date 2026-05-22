@@ -123,10 +123,13 @@ export default function Dashboard() {
 
   const handleSchedule = async (data: { title: string; description: string; scheduled_at: string; duration_minutes: number }) => {
     try {
-      await api.scheduleMeeting(data);
+      const meeting = await api.scheduleMeeting(data);
       await fetchMeetings();
-    } catch {}
-    setShowSchedule(false);
+      return meeting;
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
   };
 
   return (
