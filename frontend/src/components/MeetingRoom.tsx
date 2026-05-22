@@ -498,6 +498,22 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           if (me) {
             setIsMuted(me.is_muted);
             setIsVideoOn(me.is_video_on);
+
+            // Sync local microphone stream state with remote database/host settings
+            localStreamRef.current?.getAudioTracks().forEach(t => {
+              if (t.enabled === me.is_muted) {
+                t.enabled = !me.is_muted;
+                showToast(me.is_muted ? "The host has muted your microphone" : "The host has unmuted your microphone", "info");
+              }
+            });
+
+            // Sync local camera stream state with remote database/host settings
+            localStreamRef.current?.getVideoTracks().forEach(t => {
+              if (t.enabled !== me.is_video_on) {
+                t.enabled = me.is_video_on;
+                showToast(me.is_video_on ? "The host has enabled your camera" : "The host has disabled your camera", "info");
+              }
+            });
           }
         } else if (msg.type === 'new_message') {
           const m = msg.data;
@@ -1209,18 +1225,58 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
                     {p.role === 'host' && <span className="participant-role"> (Host)</span>}
                   </span>
                   <div className="participant-controls">
-                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: p.is_muted ? '#ef4444' : '#10B981' }}>
-                      {p.is_muted ? 'mic_off' : 'mic'}
-                    </span>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: p.is_video_on ? '#10B981' : '#ef4444' }}>
-                      {p.is_video_on ? 'videocam' : 'videocam_off'}
-                    </span>
+                    {amHost && p.role !== 'host' ? (
+                      <button
+                        className="participant-ctrl-btn"
+                        title={p.is_muted ? "Unmute" : "Mute"}
+                        onClick={async () => {
+                          try {
+                            await api.updateParticipant(p.id, { is_muted: !p.is_muted });
+                          } catch (err) {
+                            console.error("Failed to toggle mute:", err);
+                          }
+                        }}
+                        style={{ color: p.is_muted ? '#ef4444' : '#10B981' }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                          {p.is_muted ? 'mic_off' : 'mic'}
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: p.is_muted ? '#ef4444' : '#10B981' }}>
+                        {p.is_muted ? 'mic_off' : 'mic'}
+                      </span>
+                    )}
+
+                    {amHost && p.role !== 'host' ? (
+                      <button
+                        className="participant-ctrl-btn"
+                        title={p.is_video_on ? "Disable Camera" : "Enable Camera"}
+                        onClick={async () => {
+                          try {
+                            await api.updateParticipant(p.id, { is_video_on: !p.is_video_on });
+                          } catch (err) {
+                            console.error("Failed to toggle camera:", err);
+                          }
+                        }}
+                        style={{ color: p.is_video_on ? '#10B981' : '#ef4444' }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                          {p.is_video_on ? 'videocam' : 'videocam_off'}
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: p.is_video_on ? '#10B981' : '#ef4444' }}>
+                        {p.is_video_on ? 'videocam' : 'videocam_off'}
+                      </span>
+                    )}
+
                     {amHost && p.role !== 'host' && (
                       <button
                         className="participant-ctrl-btn"
                         title="Remove"
                         onClick={() => handleRemoveParticipant(p.id)}
-                        style={{ marginLeft: 10, color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ marginLeft: 6, color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                       </button>
