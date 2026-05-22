@@ -106,7 +106,18 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   const [lobbyMuted, setLobbyMuted] = useState(false);
   const [lobbyVideoOff, setLobbyVideoOff] = useState(false);
   const lobbyVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [meetingPasscode, setMeetingPasscode] = useState('');
+  const [meetingPasscode, setMeetingPasscode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('passcode') || '';
+    }
+    return '';
+  });
+  const [hasUrlPasscode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).has('passcode');
+    }
+    return false;
+  });
   const [rememberName, setRememberName] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('zoom_remember_name_flag') === 'true';
@@ -818,16 +829,18 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             <div className="zoom-lobby-form-card">
               <h1 className="lobby-form-title">Enter Meeting Info</h1>
               <form onSubmit={handleGuestJoinSubmit} className="lobby-joining-form">
-                <div className="form-group-field">
-                  <label htmlFor="passcode-input">Meeting Passcode</label>
-                  <input
-                    type="text"
-                    id="passcode-input"
-                    placeholder="Enter meeting passcode"
-                    value={meetingPasscode}
-                    onChange={e => setMeetingPasscode(e.target.value)}
-                  />
-                </div>
+                {!hasUrlPasscode && (
+                  <div className="form-group-field">
+                    <label htmlFor="passcode-input">Meeting Passcode</label>
+                    <input
+                      type="text"
+                      id="passcode-input"
+                      placeholder="Enter meeting passcode"
+                      value={meetingPasscode}
+                      onChange={e => setMeetingPasscode(e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <div className="form-group-field">
                   <label htmlFor="guest-name-input">Your Name</label>
