@@ -25,7 +25,72 @@ export default function Dashboard() {
     } catch {
       // Fallback sample data if API not available
       setUpcoming([
-        { id: 1, meeting_id: '940-5050-6425', title: 'My Meeting', description: 'Quarterly sprint planning', host_id: 1, status: 'scheduled', scheduled_at: new Date().toISOString(), duration_minutes: 40, invite_link: '/meeting/940-5050-6425', passcode: 'abc123', created_at: new Date().toISOString(), ended_at: null, host: null, participants: [] }
+        { 
+          id: 1, 
+          meeting_id: '940-5050-6425', 
+          title: 'Sprint Planning - Q3 Goals', 
+          description: 'Quarterly sprint planning', 
+          host_id: 1, 
+          status: 'scheduled', 
+          scheduled_at: new Date().toISOString(), 
+          duration_minutes: 40, 
+          invite_link: '/meeting/940-5050-6425', 
+          passcode: 'abc123', 
+          created_at: new Date().toISOString(), 
+          ended_at: null, 
+          host: { id: 1, name: 'dhruv tiwari', email: 'dhruv@example.com', avatar_url: null, created_at: '' }, 
+          participants: [] 
+        },
+        { 
+          id: 2, 
+          meeting_id: '175-1066-3764', 
+          title: 'Design Review: Workplace UI', 
+          description: 'Workplace design review', 
+          host_id: 1, 
+          status: 'scheduled', 
+          scheduled_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), 
+          duration_minutes: 60, 
+          invite_link: '/meeting/175-1066-3764', 
+          passcode: 'abc123', 
+          created_at: new Date().toISOString(), 
+          ended_at: null, 
+          host: { id: 1, name: 'dhruv tiwari', email: 'dhruv@example.com', avatar_url: null, created_at: '' }, 
+          participants: [] 
+        }
+      ]);
+      setRecent([
+        { 
+          id: 3, 
+          meeting_id: '826-6302-7753', 
+          title: 'WebRTC Connection Sync-Up', 
+          description: 'Weekly WebRTC sync', 
+          host_id: 1, 
+          status: 'ended', 
+          scheduled_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), 
+          duration_minutes: 30, 
+          invite_link: '/meeting/826-6302-7753', 
+          passcode: 'abc123', 
+          created_at: new Date().toISOString(), 
+          ended_at: new Date(Date.now() - 23.5 * 60 * 60 * 1000).toISOString(), 
+          host: { id: 1, name: 'dhruv tiwari', email: 'dhruv@example.com', avatar_url: null, created_at: '' }, 
+          participants: [] 
+        },
+        { 
+          id: 4, 
+          meeting_id: '492-9405-1940', 
+          title: 'Zoom Workplace App Demo', 
+          description: 'Final app demo', 
+          host_id: 1, 
+          status: 'ended', 
+          scheduled_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(), 
+          duration_minutes: 60, 
+          invite_link: '/meeting/492-9405-1940', 
+          passcode: 'abc123', 
+          created_at: new Date().toISOString(), 
+          ended_at: new Date(Date.now() - 47 * 60 * 60 * 1000).toISOString(), 
+          host: { id: 1, name: 'dhruv tiwari', email: 'dhruv@example.com', avatar_url: null, created_at: '' }, 
+          participants: [] 
+        }
       ]);
     }
     setLoading(false);

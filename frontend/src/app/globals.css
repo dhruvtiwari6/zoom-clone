@@ -1212,3 +1212,103 @@ body {
     max-width: 100%;
   }
 }
+
+/* ── Modern Meeting Tabs Dashboard Integration ────────────────────────────── */
+.meeting-tabs-row {
+  display: flex;
+  border-bottom: 1px solid #F3F4F6;
+  background: #F9FAFB;
+}
+
+.meeting-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6E7687;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.meeting-tab-btn:hover {
+  background: #F3F4F6;
+  color: #1B1C20;
+}
+
+.meeting-tab-btn.active {
+  color: #0B5CFF;
+  border-bottom-color: #0B5CFF;
+  background: #ffffff;
+}
+
+.meeting-tab-btn .tab-icon {
+  font-size: 16px !important;
+}
+
+/* Ended Badge styling */
+.ended-badge {
+  background: #6E7687;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Rejoin button styling */
+.btn-rejoin-meeting {
+  background: transparent;
+  color: #6E7687;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-rejoin-meeting:hover {
+  background: #F3F4F6;
+  color: #1B1C20;
+  border-color: #D1D5DB;
+}
+
+/* Empty State elements */
+.empty-meetings-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.empty-meetings-state .empty-icon {
+  font-size: 48px !important;
+  color: #9CA3AF;
+  margin-bottom: 12px;
+}
+
+.empty-meetings-state .empty-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1B1C20;
+  margin-bottom: 4px;
+}
+
+.empty-meetings-state .empty-subtitle {
+  font-size: 12px;
+  color: #6E7687;
+  max-width: 280px;
+  line-height: 1.4;
+}
