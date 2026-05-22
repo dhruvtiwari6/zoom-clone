@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import db
-from app.routers import meetings, participants
+from app.routes import meetings, participants
 from app.seed import seed
 from app.websocket_manager import manager
 

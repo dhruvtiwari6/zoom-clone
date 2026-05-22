@@ -18,6 +18,7 @@ from app.schemas import (
 )
 from app.config import get_settings
 from app.websocket_manager import manager
+from app.services.livekit import generate_livekit_token
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 settings = get_settings()
@@ -277,26 +278,8 @@ async def get_join_token(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
 
-    import os
-    from livekit import api
-    
-    # Ensure LiveKit SDK reads the configured credentials robustly
-    os.environ['LIVEKIT_API_KEY'] = settings.LIVEKIT_API_KEY
-    os.environ['LIVEKIT_API_SECRET'] = settings.LIVEKIT_API_SECRET
-
     try:
-        token = (
-            api.AccessToken()
-            .with_identity(participant_identity)
-            .with_name(participant_name)
-            .with_grants(
-                api.VideoGrants(
-                    room_join=True,
-                    room=meeting_id,
-                )
-            )
-            .to_jwt()
-        )
+        token = generate_livekit_token(meeting_id, participant_identity, participant_name)
         return {"token": token, "server_url": settings.LIVEKIT_WS_URL}
     except Exception as e:
         raise HTTPException(
