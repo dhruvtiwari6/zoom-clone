@@ -598,9 +598,19 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
   // ── Clock ───────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const t = setInterval(() => setElapsed(e => e + 1), 1000);
+    if (!meeting?.scheduled_at) return;
+    
+    const updateTimer = () => {
+      const start = new Date(meeting.scheduled_at!);
+      const now = new Date();
+      const diff = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 1000));
+      setElapsed(diff);
+    };
+
+    updateTimer();
+    const t = setInterval(updateTimer, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [meeting?.scheduled_at]);
 
   const formatElapsed = (s: number) => {
     const m = Math.floor(s / 60).toString().padStart(2, '0');

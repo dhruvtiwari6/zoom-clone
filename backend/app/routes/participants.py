@@ -68,9 +68,13 @@ async def join_meeting(
 
     # Auto-activate scheduled meetings when first participant joins
     if meeting.status == "scheduled":
+        from datetime import datetime, timezone
         await db.meeting.update(
             where={"id": meeting.id},
-            data={"status": "active"},
+            data={
+                "status": "active",
+                "scheduled_at": datetime.now(timezone.utc)
+            },
         )
 
     # Deduplication — return existing active participant if same name
