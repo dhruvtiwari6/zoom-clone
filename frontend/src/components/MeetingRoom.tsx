@@ -100,6 +100,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   const [guestJoinError, setGuestJoinError] = useState('');
   const [localParticipantId, setLocalParticipantId] = useState<number | null>(null);
   const [localDisplayName, setLocalDisplayName] = useState<string>('');
+  const [waitingNotice, setWaitingNotice] = useState<{ id: number, name: string } | null>(null);
 
   // Lobby Preview states
   const [lobbyStream, setLobbyStream] = useState<MediaStream | null>(null);
@@ -180,9 +181,13 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   }, []);
 
   // ── LiveKit Integration ─────────────────────────────────────────────────────
+  const myRole = participants.find(p => p.id === localParticipantId)?.role;
+
   // LiveKit Connection Effect
   useEffect(() => {
     if (!hasJoined || !localParticipantId || !localDisplayName || !mediaReady) return;
+
+    if (!myRole || (myRole as string) === 'waiting') return;
 
     let isDestroyed = false;
     let room: Room | null = null;
@@ -283,7 +288,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
         console.log("[LiveKit] Disconnected from room");
       }
     };
-  }, [hasJoined, localParticipantId, localDisplayName, meetingId, mediaReady]);
+  }, [hasJoined, localParticipantId, localDisplayName, meetingId, mediaReady, myRole]);
 
   useEffect(() => {
     const room = roomRef.current;
@@ -774,16 +779,123 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   const getInitials = (name: string) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
-  const gridClass =
-    participants.length <= 1 ? 'grid-1' :
-    participants.length === 2 ? 'grid-2' :
-    participants.length <= 4 ? 'grid-3-4' : 'grid-5-plus';
+  const prevWaitingIdsRef = useRef<number[]>([]);
+  useEffect(() => {
+    const isHost = participants.find(p => p.id === localParticipantId)?.role === 'host';
+    if (!isHost) return;
+    const currentWaiting = participants.filter(p => (p.role as string) === 'waiting');
+    const prevIds = prevWaitingIdsRef.current;
+    
+    // Find if there's any new waiting participant
+    const newlyWaiting = currentWaiting.find(p => !prevIds.includes(p.id));
+    if (newlyWaiting) {
+      setWaitingNotice({ id: newlyWaiting.id, name: newlyWaiting.display_name });
+    }
+    
+    // If the currently noticed participant is no longer waiting, clear notice
+    if (waitingNotice && !currentWaiting.some(p => p.id === waitingNotice.id)) {
+      setWaitingNotice(null);
+    }
+    
+    prevWaitingIdsRef.current = currentWaiting.map(p => p.id);
+  }, [participants, localParticipantId, waitingNotice]);
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="meeting-room" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ color: '#fff', fontSize: '16px', opacity: 0.7 }}>Connecting to meeting…</div>
+      </div>
+    );
+  }
+
+  const myParticipant = participants.find(p => p.id === localParticipantId);
+  const isWaiting = (myParticipant?.role as string) === 'waiting';
+
+  if (isWaiting) {
+    return (
+      <div className="zoom-lobby-screen waiting-room-screen" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(20px)',
+          padding: '48px 40px',
+          borderRadius: '24px',
+          maxWidth: '480px',
+          width: '90%',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          animation: 'fadeIn 0.6s ease-out'
+        }}>
+          {/* Glowing Waiting Room Icon / Animation */}
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            background: 'rgba(13, 110, 253, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '24px',
+            border: '2px solid rgba(13, 110, 253, 0.2)',
+            position: 'relative'
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '40px', color: '#0d6efd' }}>
+              hourglass_empty
+            </span>
+            <div className="pulse-ring"></div>
+          </div>
+
+          <h2 style={{ color: '#fff', fontSize: '24px', fontWeight: 600, marginBottom: '12px', letterSpacing: '-0.5px' }}>
+            Waiting Room
+          </h2>
+          <p style={{ color: '#a0aec0', fontSize: '15px', lineHeight: '1.6', marginBottom: '24px', maxWidth: '360px' }}>
+            Please wait, the meeting host will let you in soon.
+          </p>
+
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            width: '100%',
+            marginBottom: '32px',
+            textAlign: 'left'
+          }}>
+            <div style={{ fontSize: '12px', color: '#718096', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '4px' }}>
+              Meeting Title
+            </div>
+            <div style={{ fontSize: '16px', color: '#e2e8f0', fontWeight: 500 }}>
+              {meeting?.title || 'Zoom Meeting'}
+            </div>
+          </div>
+
+          <button
+            onClick={handleEndCall}
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#ef4444',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: '12px',
+              padding: '12px 24px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              width: '100%'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+            }}
+          >
+            Leave Meeting
+          </button>
+        </div>
       </div>
     );
   }
@@ -919,18 +1031,128 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     );
   }
 
+  const admittedParticipants = participants.filter(p => (p.role as string) !== 'waiting');
+  const waitingParticipants = participants.filter(p => (p.role as string) === 'waiting');
   const amHost = participants.find(p => p.id === localParticipantId)?.role === 'host';
 
   const activeScreenSharer = isScreenSharing
     ? { id: localParticipantId, display_name: 'Your Screen', isLocal: true }
     : (() => {
-        const remoteSharer = participants.find(p => screensharingParticipants[p.id]);
+        const remoteSharer = admittedParticipants.find(p => screensharingParticipants[p.id]);
         return remoteSharer ? { ...remoteSharer, isLocal: false } : null;
       })();
+
+  const gridClass =
+    admittedParticipants.length <= 1 ? 'grid-1' :
+    admittedParticipants.length === 2 ? 'grid-2' :
+    admittedParticipants.length <= 4 ? 'grid-3-4' : 'grid-5-plus';
 
   // ── Main meeting room ───────────────────────────────────────────────────────
   return (
     <div className="meeting-room">
+      {waitingNotice && (
+        <div style={{
+          position: 'absolute',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          background: 'rgba(30, 41, 59, 0.95)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(20px)',
+          animation: 'slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+          minWidth: '380px'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            background: 'rgba(13, 110, 253, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid rgba(13, 110, 253, 0.3)'
+          }}>
+            <span className="material-symbols-outlined" style={{ color: '#0d6efd', fontSize: '20px' }}>
+              person_add
+            </span>
+          </div>
+          
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+            <span style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>
+              {waitingNotice.name}
+            </span>
+            <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+              waiting in the lobby
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={async () => {
+                try {
+                  await api.updateParticipant(waitingNotice.id, { role: 'participant' });
+                  setWaitingNotice(null);
+                } catch (e) {
+                  console.error("Admit error:", e);
+                }
+              }}
+              style={{
+                background: '#10b981',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px 14px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+            >
+              Admit
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  await api.removeParticipant(waitingNotice.id);
+                  setWaitingNotice(null);
+                } catch (e) {
+                  console.error("Decline error:", e);
+                }
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: '#94a3b8',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                padding: '8px 14px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.color = '#94a3b8';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+              }}
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="meeting-room-header">
         <div className="meeting-info">
@@ -1064,7 +1286,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
               {/* Participant Strip */}
               <div className="participant-strip">
-                {participants.map((p, i) => {
+                {admittedParticipants.map((p, i) => {
                   const isCurrentSharer = p.id === activeScreenSharer.id;
                   return (
                     <div
@@ -1140,7 +1362,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             </div>
           ) : (
             <div className={`video-grid ${gridClass}`}>
-              {participants.map((p, i) => (
+              {admittedParticipants.map((p, i) => (
                 <div
                   key={`${p.id}-${i}`}
                   className={`video-tile ${i === 0 ? 'speaking' : ''} ${!p.is_video_on ? 'video-off' : ''}`}
@@ -1213,7 +1435,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
         {showParticipants && (
           <div className="side-panel">
             <div className="side-panel-header">
-              <h3>Participants ({participants.length})</h3>
+              <h3>Participants ({admittedParticipants.length})</h3>
               <button className="side-panel-close" onClick={() => setShowParticipants(false)}>
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
               </button>
@@ -1226,10 +1448,76 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
               </div>
             )}
             <div className="side-panel-body">
-              {participants.map((p, i) => (
+              {/* Waiting Room Section for Host */}
+              {amHost && waitingParticipants.length > 0 && (
+                <div style={{ marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px' }}>
+                  <h4 style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#3b82f6' }}>hourglass_empty</span>
+                    Waiting Room ({waitingParticipants.length})
+                  </h4>
+                  {waitingParticipants.map((p, i) => (
+                    <div className="participant-item" key={`waiting-${p.id}-${i}`} style={{ padding: '8px 0', display: 'flex', alignItems: 'center' }}>
+                      <div className="participant-avatar" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{getInitials(p.display_name)}</div>
+                      <span className="participant-name" style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px', textAlign: 'left' }}>
+                        {p.display_name}
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await api.updateParticipant(p.id, { role: 'participant' });
+                            } catch (err) {
+                              console.error("Admit failed:", err);
+                            }
+                          }}
+                          style={{
+                            background: '#10b981',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Admit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await api.removeParticipant(p.id);
+                            } catch (err) {
+                              console.error("Decline failed:", err);
+                            }
+                          }}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            borderRadius: '6px',
+                            padding: '5px 10px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* In the Meeting Section */}
+              <h4 style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', textAlign: 'left' }}>
+                In the Meeting ({admittedParticipants.length})
+              </h4>
+              {admittedParticipants.map((p, i) => (
                 <div className="participant-item" key={`${p.id}-${i}`}>
                   <div className="participant-avatar">{getInitials(p.display_name)}</div>
-                  <span className="participant-name">
+                  <span className="participant-name" style={{ textAlign: 'left' }}>
                     {p.display_name}
                     {p.id === localParticipantId && ' (Me)'}
                     {p.role === 'host' && <span className="participant-role"> (Host)</span>}

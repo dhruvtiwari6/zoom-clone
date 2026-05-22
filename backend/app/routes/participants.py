@@ -89,12 +89,15 @@ async def join_meeting(
         await _broadcast_participants(meeting.id, meeting_id, db)
         return existing
 
+    is_host = data.user_id == meeting.host_id if data.user_id else False
+    role = "host" if is_host else "waiting"
+
     participant = await db.participant.create(
         data={
             "meeting_id": meeting.id,
             "user_id": data.user_id,
             "display_name": data.display_name,
-            "role": "participant",
+            "role": role,
             "is_muted": False,
             "is_video_on": True,
         }
