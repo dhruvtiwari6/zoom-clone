@@ -213,6 +213,10 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
                 [pid]: new MediaStream([track.mediaStreamTrack])
               }));
             }
+          } else if (track.kind === 'audio') {
+            const audioElement = track.attach();
+            audioElement.autoplay = true;
+            document.body.appendChild(audioElement);
           }
         });
 
@@ -221,15 +225,21 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           const pid = parseInt(participant.identity);
           if (isNaN(pid)) return;
 
-          if (publication.source === Track.Source.ScreenShare) {
-            setScreensharingParticipants(prev => ({ ...prev, [pid]: false }));
+          if (track.kind === 'video') {
+            if (publication.source === Track.Source.ScreenShare) {
+              setScreensharingParticipants(prev => ({ ...prev, [pid]: false }));
+            }
+            
+            setRemoteStreams(prev => {
+              const next = { ...prev };
+              delete next[pid];
+              return next;
+            });
+          } else if (track.kind === 'audio') {
+            track.detach();
+            const elements = track.attachedElements;
+            elements.forEach(el => el.remove());
           }
-          
-          setRemoteStreams(prev => {
-            const next = { ...prev };
-            delete next[pid];
-            return next;
-          });
         });
 
         await room.connect(server_url, token);
