@@ -129,21 +129,21 @@ export default function ScheduleModal({ isOpen, onClose, onSchedule }: ScheduleM
             </p>
 
             <div style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(14, 113, 235, 0.04)',
+              border: '1px solid rgba(14, 113, 235, 0.15)',
               borderRadius: '12px',
               padding: '16px',
               textAlign: 'left',
               fontSize: '13px',
-              color: 'var(--zoom-text-secondary)',
+              color: '#4A5568',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
               marginBottom: '24px'
             }}>
-              <div><strong>Meeting ID:</strong> {successMeeting.meeting_id}</div>
-              <div><strong>Passcode:</strong> <code style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>{successMeeting.passcode}</code></div>
-              <div><strong>Scheduled Time:</strong> {new Date(successMeeting.scheduled_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+              <div><strong style={{ color: '#1A202C' }}>Meeting ID:</strong> <span style={{ fontFamily: 'monospace', fontSize: '14px', color: '#1A202C', fontWeight: 600 }}>{successMeeting.meeting_id}</span></div>
+              <div><strong style={{ color: '#1A202C' }}>Passcode:</strong> <code style={{ color: '#0E71EB', background: 'rgba(14, 113, 235, 0.12)', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '14px', marginLeft: '4px' }}>{successMeeting.passcode}</code></div>
+              <div><strong style={{ color: '#1A202C' }}>Scheduled Time:</strong> <span style={{ color: '#1A202C' }}>{new Date(successMeeting.scheduled_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span></div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
