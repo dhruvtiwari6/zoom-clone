@@ -96,7 +96,8 @@ export default function ScheduleModal({ isOpen, onClose, onSchedule }: ScheduleM
       location: location,
     });
     
-    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    const calendarUrl = `https://calendar.google.com/calendar/render?${params.toString()}`;
+    return `https://accounts.google.com/AccountChooser?continue=${encodeURIComponent(calendarUrl)}`;
   };
 
   // Minimum date is today
