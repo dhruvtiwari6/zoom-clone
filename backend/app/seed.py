@@ -29,7 +29,6 @@ async def seed():
     if not user:
         user = await db.user.create(
             data={
-                "id": 1,
                 "name": "Dhruv Tiwari",
                 "email": "dhruv.tiwari@example.com",
             }
