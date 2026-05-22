@@ -89,6 +89,7 @@ class ParticipantJoin(BaseModel):
     """Schema for joining a meeting."""
     display_name: str = Field(max_length=255)
     user_id: Optional[int] = None
+    passcode: Optional[str] = None
 
 
 class ParticipantUpdate(BaseModel):

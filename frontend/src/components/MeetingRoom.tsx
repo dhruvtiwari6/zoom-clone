@@ -386,9 +386,13 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
         // Guest via ?name= query param
         const urlParams = new URLSearchParams(window.location.search);
         const queryName = urlParams.get('name');
+        const queryPasscode = urlParams.get('passcode') || '';
         if (queryName) {
           try {
-            const part = await api.joinMeeting(meetingId, { display_name: queryName });
+            const part = await api.joinMeeting(meetingId, {
+              display_name: queryName,
+              passcode: queryPasscode,
+            });
             sessionStorage.setItem(`p_id_${meetingId}`, part.id.toString());
             sessionStorage.setItem(`p_name_${meetingId}`, queryName);
             setLocalParticipantId(part.id);
@@ -716,7 +720,10 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     }
 
     try {
-      const part = await api.joinMeeting(meetingId, { display_name: guestName.trim() });
+      const part = await api.joinMeeting(meetingId, {
+        display_name: guestName.trim(),
+        passcode: meetingPasscode.trim(),
+      });
       sessionStorage.setItem(`p_id_${meetingId}`, part.id.toString());
       sessionStorage.setItem(`p_name_${meetingId}`, guestName.trim());
       setLocalParticipantId(part.id);
@@ -1262,7 +1269,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             </div>
             <div className="side-panel-body" style={{ padding: 0 }}>
               <div className="invite-row">
-                <div className="invite-label">Meeting ID</div>
+                <div className="invite-label">Meeting ID </div>
                 <div className="invite-value">
                   <span>{meetingId}</span>
                   <button className={`invite-copy-btn ${copiedField==='id'?'copied':''}`} onClick={() => handleCopyInvite(meetingId,'id')}>{copiedField==='id'?'✓ Copied':'Copy'}</button>

@@ -57,6 +57,7 @@ export interface MeetingSchedulePayload {
 export interface JoinPayload {
   display_name: string;
   user_id?: number;
+  passcode?: string;
 }
 
 export interface Message {

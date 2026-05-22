@@ -52,6 +52,17 @@ async def join_meeting(
     meeting = await db.meeting.find_unique(where={"meeting_id": meeting_id})
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
+        
+    # Validate passcode if one is configured for the meeting and the user is not the host
+    if meeting.passcode and meeting.passcode.strip() != "":
+        is_host = data.user_id == meeting.host_id
+        if not is_host:
+            if not data.passcode or data.passcode.strip() != meeting.passcode.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect meeting passcode"
+                )
+
     if meeting.status == "ended":
         raise HTTPException(status_code=400, detail="This meeting has already ended")
 
