@@ -182,7 +182,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   // ── LiveKit Integration ─────────────────────────────────────────────────────
   // LiveKit Connection Effect
   useEffect(() => {
-    if (!hasJoined || !localParticipantId || !localDisplayName) return;
+    if (!hasJoined || !localParticipantId || !localDisplayName || !mediaReady) return;
 
     let isDestroyed = false;
     let room: Room | null = null;
@@ -245,7 +245,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
               const next = { ...prev };
               delete next[pid];
               return next;
-            });
+              });
           } else if (track.kind === 'audio') {
             track.detach();
             const elements = track.attachedElements;
@@ -283,7 +283,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
         console.log("[LiveKit] Disconnected from room");
       }
     };
-  }, [hasJoined, localParticipantId, localDisplayName, meetingId]);
+  }, [hasJoined, localParticipantId, localDisplayName, meetingId, mediaReady]);
 
   useEffect(() => {
     const room = roomRef.current;
