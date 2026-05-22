@@ -261,3 +261,44 @@ async def list_messages(
         order={"created_at": "asc"},
     )
     return list(messages)
+
+
+@router.post("/{meeting_id}/token")
+async def get_join_token(
+    meeting_id: str,
+    participant_identity: str = Query(...),
+    participant_name: str = Query(...),
+    db: Prisma = Depends(get_db),
+):
+    """Generate an AccessToken for joining a LiveKit room."""
+    meeting = await db.meeting.find_unique(where={"meeting_id": meeting_id})
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    import os
+    from livekit import api
+    
+    # Ensure LiveKit SDK reads the configured credentials robustly
+    os.environ['LIVEKIT_API_KEY'] = settings.LIVEKIT_API_KEY
+    os.environ['LIVEKIT_API_SECRET'] = settings.LIVEKIT_API_SECRET
+
+    try:
+        token = (
+            api.AccessToken()
+            .with_identity(participant_identity)
+            .with_name(participant_name)
+            .with_grants(
+                api.VideoGrants(
+                    room_join=True,
+                    room=meeting_id,
+                )
+            )
+            .to_jwt()
+        )
+        return {"token": token, "server_url": settings.LIVEKIT_WS_URL}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate access token: {str(e)}"
+        )
+

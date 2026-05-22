@@ -111,4 +111,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // Get LiveKit access token
+  getJoinToken: (meetingId: string, identity: string, name: string) =>
+    request<{ token: string; server_url: string }>(
+      `/api/meetings/${meetingId}/token?participant_identity=${encodeURIComponent(identity)}&participant_name=${encodeURIComponent(name)}`,
+      { method: 'POST' }
+    ),
 };

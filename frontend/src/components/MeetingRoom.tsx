@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import type { Meeting, Participant } from '@/types';
 import { api } from '@/lib/api';
 import ToastContainer, { ToastItem } from './Toast';
+import { Room, RoomEvent, Track } from 'livekit-client';
+
 
 interface MeetingRoomProps { meetingId: string; }
 interface ChatMessage { id?: number; name: string; time: string; text: string; }
@@ -91,8 +93,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   const originalCamTrackRef = useRef<MediaStreamTrack | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  const pcsRef = useRef<Record<number, RTCPeerConnection>>({});
-  const iceBufferRef = useRef<Record<number, RTCIceCandidateInit[]>>({});
+  const roomRef = useRef<Room | null>(null);
   const participantsRef = useRef<Participant[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<number, MediaStream>>({});
 
@@ -133,107 +134,119 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
   }, []);
 
-  // WebRTC Peer Connection Helper
-  const getOrCreatePC = useCallback((peerId: number, ws: WebSocket) => {
-    if (pcsRef.current[peerId]) return pcsRef.current[peerId];
+  // ── LiveKit Integration ─────────────────────────────────────────────────────
+  // LiveKit Connection Effect
+  useEffect(() => {
+    if (!hasJoined || !localParticipantId || !localDisplayName) return;
 
-    console.log(`[WebRTC] Creating PeerConnection for peer ${peerId}`);
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    });
-    pcsRef.current[peerId] = pc;
+    let isDestroyed = false;
+    let room: Room | null = null;
 
-    // Handle local ICE candidates
-    pc.onicecandidate = (event) => {
-      if (event.candidate && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'webrtc-ice',
-          sender_id: localPidRef.current,
-          target_id: peerId,
-          candidate: {
-            candidate: event.candidate.candidate,
-            sdpMid: event.candidate.sdpMid,
-            sdpMLineIndex: event.candidate.sdpMLineIndex
-          }
-        }));
-      }
-    };
+    const connectToLiveKit = async () => {
+      try {
+        console.log("[LiveKit] Requesting access token for identity:", localParticipantId);
+        const { token, server_url } = await api.getJoinToken(
+          meetingId,
+          localParticipantId.toString(),
+          localDisplayName
+        );
 
-    // Handle incoming remote tracks
-    pc.ontrack = (event) => {
-      console.log(`[WebRTC] Received remote track from peer ${peerId}, kind: ${event.track.kind}`);
-      setRemoteStreams(prev => {
-        const existing = prev[peerId];
-        const newStream = new MediaStream(existing ? existing.getTracks() : []);
-        if (!newStream.getTracks().some(t => t.id === event.track.id)) {
-          newStream.addTrack(event.track);
-        }
-        return {
-          ...prev,
-          [peerId]: newStream
-        };
-      });
-    };
+        if (isDestroyed) return;
 
-    // Standard negotiationneeded handler (only client with HIGHER ID initiates the offer)
-    pc.onnegotiationneeded = async () => {
-      const pid = localPidRef.current;
-      if (pid && pid > peerId) {
-        try {
-          console.log(`[WebRTC] negotiationneeded: Initiating offer to peer ${peerId}`);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'webrtc-offer',
-              sender_id: pid,
-              target_id: peerId,
-              sdp: offer
-            }));
-          }
-        } catch (e) {
-          console.error('[WebRTC] negotiationneeded offer error:', e);
-        }
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log(`[WebRTC] Peer ${peerId} connectionState changed to:`, pc.connectionState);
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        pc.close();
-        delete pcsRef.current[peerId];
-        setRemoteStreams(prev => {
-          const next = { ...prev };
-          delete next[peerId];
-          return next;
+        console.log("[LiveKit] Connecting to server:", server_url);
+        room = new Room({
+          adaptiveStream: true,
+          dynacast: true,
         });
+        roomRef.current = room;
+
+        // Set up event listeners
+        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          console.log(`[LiveKit] Subscribed to track ${track.sid} from participant ${participant.identity}`);
+          const pid = parseInt(participant.identity);
+          if (isNaN(pid)) return;
+
+          if (track.kind === 'video') {
+            if (publication.source === Track.Source.ScreenShare) {
+              setScreensharingParticipants(prev => ({ ...prev, [pid]: true }));
+              setRemoteStreams(prev => ({
+                ...prev,
+                [pid]: new MediaStream([track.mediaStreamTrack])
+              }));
+            } else {
+              setRemoteStreams(prev => ({
+                ...prev,
+                [pid]: new MediaStream([track.mediaStreamTrack])
+              }));
+            }
+          }
+        });
+
+        room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+          console.log(`[LiveKit] Unsubscribed from track ${track.sid} from participant ${participant.identity}`);
+          const pid = parseInt(participant.identity);
+          if (isNaN(pid)) return;
+
+          if (publication.source === Track.Source.ScreenShare) {
+            setScreensharingParticipants(prev => ({ ...prev, [pid]: false }));
+          }
+          
+          setRemoteStreams(prev => {
+            const next = { ...prev };
+            delete next[pid];
+            return next;
+          });
+        });
+
+        await room.connect(server_url, token);
+        console.log("[LiveKit] Connected successfully!");
+
+        // Publish local camera and microphone
+        if (localStreamRef.current) {
+          const videoTrack = localStreamRef.current.getVideoTracks()[0];
+          const audioTrack = localStreamRef.current.getAudioTracks()[0];
+
+          if (videoTrack && isVideoOn) {
+            await room.localParticipant.publishTrack(videoTrack, { name: 'camera' });
+          }
+          if (audioTrack && !isMuted) {
+            await room.localParticipant.publishTrack(audioTrack, { name: 'microphone' });
+          }
+        }
+      } catch (err) {
+        console.error("[LiveKit] Connection failed:", err);
+        showToast("LiveKit Media Server connection failed", "error");
       }
     };
 
-    // Add local stream tracks if available
-    let hasAudio = false;
-    let hasVideo = false;
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, localStreamRef.current!);
-        if (track.kind === 'audio') hasAudio = true;
-        if (track.kind === 'video') hasVideo = true;
+    connectToLiveKit();
+
+    return () => {
+      isDestroyed = true;
+      if (room) {
+        room.disconnect();
+        console.log("[LiveKit] Disconnected from room");
+      }
+    };
+  }, [hasJoined, localParticipantId, localDisplayName, meetingId]);
+
+  useEffect(() => {
+    const room = roomRef.current;
+    if (room && room.localParticipant) {
+      room.localParticipant.setMicrophoneEnabled(!isMuted).catch(err => {
+        console.warn("[LiveKit] setMicrophoneEnabled error:", err);
       });
     }
+  }, [isMuted]);
 
-    // Ensure audio and video transceivers always exist to maintain constant m-line ordering!
-    if (!hasAudio) {
-      try { pc.addTransceiver('audio', { direction: 'sendrecv' }); } catch (e) { console.warn("addTransceiver audio error:", e); }
+  useEffect(() => {
+    const room = roomRef.current;
+    if (room && room.localParticipant) {
+      room.localParticipant.setCameraEnabled(isVideoOn).catch(err => {
+        console.warn("[LiveKit] setCameraEnabled error:", err);
+      });
     }
-    if (!hasVideo) {
-      try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch (e) { console.warn("addTransceiver video error:", e); }
-    }
-
-    return pc;
-  }, []);
+  }, [isVideoOn]);
 
   // ── WebRTC camera/mic / Lobby Preview ────────────────────────────────────────
   useEffect(() => {
@@ -363,41 +376,9 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     loadMeeting();
   }, [meetingId, router]);
 
-  // ── WebSocket connection (replaces polling) ─────────────────────────────────
+  // ── WebSocket connection (chat + reactions + state sync) ───────────────────
   useEffect(() => {
     if (!hasJoined || loading || !mediaReady) return;
-
-    // Helper to trigger mesh signaling check
-    const triggerMeshSignaling = (activeWs: WebSocket, partsList?: Participant[]) => {
-      const parts = partsList || participantsRef.current;
-      const pid = localPidRef.current;
-      if (!pid || !activeWs || activeWs.readyState !== WebSocket.OPEN) return;
-
-      console.log(`[WebRTC] Running mesh signaling check. Total participants: ${parts.length}`);
-
-      // 1. Clean up stale connections
-      Object.keys(pcsRef.current).forEach(peerIdStr => {
-        const pId = parseInt(peerIdStr);
-        if (!parts.some(p => p.id === pId)) {
-          console.log(`[WebRTC] Peer ${pId} left. Closing connection.`);
-          pcsRef.current[pId]?.close();
-          delete pcsRef.current[pId];
-          setRemoteStreams(prev => {
-            const next = { ...prev };
-            delete next[pId];
-            return next;
-          });
-        }
-      });
-
-      // 2. Establish connections with new participants (will trigger onnegotiationneeded inside getOrCreatePC)
-      parts.forEach((peer) => {
-        if (peer.id === pid) return; // skip self
-        if (!pcsRef.current[peer.id]) {
-          getOrCreatePC(peer.id, activeWs);
-        }
-      });
-    };
 
     // 1. Load initial data via REST
     const initData = async () => {
@@ -421,11 +402,6 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           setIsMuted(me.is_muted);
           setIsVideoOn(me.is_video_on);
         }
-
-        // If WS is already open, trigger signaling
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          triggerMeshSignaling(wsRef.current, parts);
-        }
       } catch (err) {
         console.error('Initial data load error:', err);
       }
@@ -438,9 +414,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
     ws.onopen = () => {
       console.log('[WS] Connected to meeting room:', meetingId);
-      // Wait 500ms to ensure initData REST call has populated the participants list
       setTimeout(() => {
-        triggerMeshSignaling(ws);
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'request_screen_share_status' }));
         }
@@ -448,7 +422,6 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     };
 
     ws.onmessage = async (event) => {
-      // Ignore plain-text heartbeat replies
       if (event.data === 'pong') return;
       try {
         const msg = JSON.parse(event.data);
@@ -457,21 +430,16 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           const parts: Participant[] = msg.data;
           setParticipants(parts);
 
-          // Check if we were removed
           const pid = localPidRef.current;
           if (pid && !parts.some(p => p.id === pid)) {
             return;
           }
 
-          // Sync own mute/video state from server
           const me = parts.find(p => p.id === pid);
           if (me) {
             setIsMuted(me.is_muted);
             setIsVideoOn(me.is_video_on);
           }
-
-          // Trigger mesh signaling check
-          triggerMeshSignaling(ws, parts);
         } else if (msg.type === 'new_message') {
           const m = msg.data;
           setMessages(prev => {
@@ -506,86 +474,12 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             [participant_id]: is_sharing
           }));
         } else if (msg.type === 'request_screen_share_status') {
-          console.log(`[ScreenShare] Received request_screen_share_status`);
           if (isScreenSharingRef.current && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'screen_share_status',
               participant_id: localPidRef.current,
               is_sharing: true
             }));
-          }
-        } else if (msg.type === 'webrtc-offer' && msg.target_id === localPidRef.current) {
-          console.log(`[WebRTC] Received offer from peer ${msg.sender_id}`);
-          const pc = getOrCreatePC(msg.sender_id, ws);
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-
-            // Drain buffered ICE candidates
-            const buffer = iceBufferRef.current[msg.sender_id] || [];
-            while (buffer.length > 0) {
-              const cand = buffer.shift();
-              if (cand) {
-                try {
-                  console.log(`[WebRTC] Draining buffered ICE candidate for peer ${msg.sender_id}`);
-                  await pc.addIceCandidate(new RTCIceCandidate(cand));
-                } catch (err) {
-                  console.warn('[WebRTC] Error adding buffered ICE candidate:', err);
-                }
-              }
-            }
-            delete iceBufferRef.current[msg.sender_id];
-
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            ws.send(JSON.stringify({
-              type: 'webrtc-answer',
-              sender_id: localPidRef.current,
-              target_id: msg.sender_id,
-              sdp: answer
-            }));
-          } catch (e) {
-            console.error('[WebRTC] Offer processing error:', e);
-          }
-        } else if (msg.type === 'webrtc-answer' && msg.target_id === localPidRef.current) {
-          console.log(`[WebRTC] Received answer from peer ${msg.sender_id}`);
-          const pc = pcsRef.current[msg.sender_id];
-          if (pc) {
-            try {
-              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-
-              // Drain buffered ICE candidates
-              const buffer = iceBufferRef.current[msg.sender_id] || [];
-              while (buffer.length > 0) {
-                const cand = buffer.shift();
-                if (cand) {
-                  try {
-                    console.log(`[WebRTC] Draining buffered ICE candidate for peer ${msg.sender_id}`);
-                    await pc.addIceCandidate(new RTCIceCandidate(cand));
-                  } catch (err) {
-                    console.warn('[WebRTC] Error adding buffered ICE candidate:', err);
-                  }
-                }
-              }
-              delete iceBufferRef.current[msg.sender_id];
-            } catch (e) {
-              console.error('[WebRTC] Answer processing error:', e);
-            }
-          }
-        } else if (msg.type === 'webrtc-ice' && msg.target_id === localPidRef.current) {
-          console.log(`[WebRTC] Received ICE candidate from peer ${msg.sender_id}`);
-          const pc = pcsRef.current[msg.sender_id];
-          if (pc && pc.remoteDescription && pc.remoteDescription.type) {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-            } catch (e) {
-              console.error('[WebRTC] ICE candidate addition error:', e);
-            }
-          } else {
-            console.log(`[WebRTC] Buffering ICE candidate from peer ${msg.sender_id} (PC or remoteDesc not ready)`);
-            if (!iceBufferRef.current[msg.sender_id]) {
-              iceBufferRef.current[msg.sender_id] = [];
-            }
-            iceBufferRef.current[msg.sender_id].push(msg.candidate);
           }
         }
       } catch (err) {
@@ -601,7 +495,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
       console.log('[WS] Connection closed');
     };
 
-    // 3. Heartbeat ping every 30 s to keep connection alive
+    // 3. Heartbeat ping every 30 s
     pingRef.current = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send('ping');
@@ -633,6 +527,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     sessionStorage.removeItem(`host_of_${meetingId}`);
     localStreamRef.current?.getTracks().forEach(t => t.stop());
     screenStreamRef.current?.getTracks().forEach(t => t.stop());
+    roomRef.current?.disconnect();
   }, [meetingId]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
@@ -675,83 +570,53 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     }
   };
 
-  const replaceVideoTrack = async (newTrack: MediaStreamTrack | null) => {
-    for (const [peerIdStr, pc] of Object.entries(pcsRef.current)) {
-      const peerId = Number(peerIdStr);
-      try {
-        const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === "video");
-        const sender = videoTransceiver?.sender;
-        if (sender) {
-          await sender.replaceTrack(newTrack);
-          console.log(`[WebRTC] Successfully replaced video track on sender for peer ${peerId}`);
-        } else {
-          console.warn(`[WebRTC] Video sender not found for peer ${peerId}`);
-        }
-      } catch (e) {
-        console.warn(`[WebRTC] replaceVideoTrack failed for peer ${peerId}`, e);
-      }
-    }
-  };
-
   const handleScreenShare = async () => {
-    if (isScreenSharing) {
-      screenTrackRef.current?.stop();
-      const cam = originalCamTrackRef.current;
-      if (cam && localStreamRef.current) {
-        const currentTrack = localStreamRef.current.getVideoTracks()[0];
-        if (currentTrack) localStreamRef.current.removeTrack(currentTrack);
-        localStreamRef.current.addTrack(cam);
-        await replaceVideoTrack(cam);
-      }
-      screenTrackRef.current = null;
-      originalCamTrackRef.current = null;
-      setIsScreenSharing(false);
-      setLocalScreenStream(null);
-      
-      // Broadcast screen share stopped
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'screen_share_status',
-          participant_id: localParticipantId,
-          is_sharing: false
-        }));
-      }
+    const room = roomRef.current;
+    if (!room || !room.localParticipant) return;
 
-      showToast('Screen sharing stopped', 'info');
-      return;
-    }
-
-    if (!localStreamRef.current) return;
     try {
-      const ds = await (navigator.mediaDevices as MediaDevices & { getDisplayMedia: (c: object) => Promise<MediaStream> }).getDisplayMedia({ video: true, audio: false });
-      const track = ds.getVideoTracks()[0];
-      
-      track.onended = () => {
-        handleScreenShare();
-      };
-      
-      const camTrack = localStreamRef.current.getVideoTracks()[0];
-      originalCamTrackRef.current = camTrack || null;
-      if (camTrack) localStreamRef.current.removeTrack(camTrack);
-      localStreamRef.current.addTrack(track);
-      screenTrackRef.current = track;
-      await replaceVideoTrack(track);
-      setIsScreenSharing(true);
-      setLocalScreenStream(ds);
+      if (isScreenSharing) {
+        await room.localParticipant.setScreenShareEnabled(false);
+        setIsScreenSharing(false);
+        setLocalScreenStream(null);
+        
+        // Broadcast screen share stopped
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'screen_share_status',
+            participant_id: localParticipantId,
+            is_sharing: false
+          }));
+        }
+        showToast('Screen sharing stopped', 'info');
+      } else {
+        await room.localParticipant.setScreenShareEnabled(true);
+        setIsScreenSharing(true);
 
-      // Broadcast screen share started
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'screen_share_status',
-          participant_id: localParticipantId,
-          is_sharing: true
-        }));
+        const screenTrackPub = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+        if (screenTrackPub && screenTrackPub.track) {
+          const track = screenTrackPub.track;
+          if (track.mediaStreamTrack) {
+            setLocalScreenStream(new MediaStream([track.mediaStreamTrack]));
+            track.mediaStreamTrack.onended = () => {
+              handleScreenShare();
+            };
+          }
+        }
+
+        // Broadcast screen share started
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'screen_share_status',
+            participant_id: localParticipantId,
+            is_sharing: true
+          }));
+        }
+        showToast('You are now sharing your screen', 'success');
       }
-
-      showToast('You are now sharing your screen', 'success');
-    } catch (e) {
-      console.warn("Screen share cancelled", e);
-      showToast('Screen share cancelled', 'info');
+    } catch (err) {
+      console.error("[LiveKit] Screen share failed:", err);
+      showToast("Screen share failed", "error");
     }
   };
 

@@ -17,3 +17,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: zoom-clone-livekit
+    command: --dev --key-file /etc/livekit.keys --bind 0.0.0.0
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.keys:/etc/livekit.keys
+    restart: unless-stopped

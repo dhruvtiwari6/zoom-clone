@@ -3,3 +3,4 @@ uvicorn[standard]==0.34.0
 pydantic-settings==2.7.0
 python-dotenv==1.0.1
 prisma==0.15.0
+livekit-api>=0.8.0

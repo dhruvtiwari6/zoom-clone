@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     APP_PORT: int = 8000
     FRONTEND_URL: str = "http://localhost:3000"
 
+    LIVEKIT_API_KEY: str = "devkey"
+    LIVEKIT_API_SECRET: str = "devsecretdevsecretdevsecretdevsecretdevsecret"
+    LIVEKIT_WS_URL: str = "ws://localhost:7880"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
