@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
+import LayoutClient from "@/components/LayoutClient";
 
 export const metadata: Metadata = {
   title: "Zoom - Video Conferencing, Web Conferencing",
@@ -21,13 +20,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
       </head>
       <body suppressHydrationWarning>
-        <div className="app-layout">
-          <Sidebar />
-          <div className="main-area">
-            <Header />
-            {children}
-          </div>
-        </div>
+        <LayoutClient>{children}</LayoutClient>
       </body>
     </html>
   );
