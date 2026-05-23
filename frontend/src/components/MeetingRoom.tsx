@@ -1312,58 +1312,44 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
         </div>
       )}
       {/* Header */}
-      <div className="meeting-room-header">
-        <div className="meeting-info">
-          <div style={{
-            padding: 3,
-            backgroundColor: '#10B981',
-            borderRadius: 4,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 4
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#fff', fontVariationSettings: "'FILL' 1" }}>verified_user</span>
+      <div className="meeting-room-header flex flex-col md:flex-row md:items-center justify-between h-auto py-2 md:py-0 md:h-12 px-4 gap-2 md:gap-0 bg-opacity-80 backdrop-blur-md border-b border-white/10 z-10 w-full">
+        {/* Left Section: Meeting Info */}
+        <div className="flex items-center gap-2 justify-between md:justify-start w-full md:w-auto">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1 bg-[#10B981] rounded flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[12px] md:text-[14px] text-white fill-current">verified_user</span>
+            </div>
+            <span className="text-white text-sm font-semibold tracking-tight truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">{meeting?.title || 'Zoom Meeting'}</span>
+            <span className="bg-white/10 text-gray-300 px-2 py-0.5 rounded text-[10px] md:text-[11px] font-mono border border-white/5">{meetingId}</span>
           </div>
-          <span className="meeting-title">{meeting?.title || 'Zoom Meeting'}</span>
-          <span className="meeting-id-badge">{meetingId}</span>
+          {/* Show timer on right of mobile header left-section */}
+          <span className="md:hidden text-white/60 text-xs font-semibold font-mono">
+            {formatElapsed(elapsed)}
+          </span>
         </div>
-        <div className="header-controls">
+
+        {/* Right Section: Status Badges and Timer */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full md:w-auto pb-1 md:pb-0 justify-start md:justify-end">
           {participants.find(p => p.id === localParticipantId)?.role === 'host' && (
-            <span className="ai-note-taker-badge" style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              color: '#3b82f6', fontSize: 11, fontWeight: 600,
-              background: 'rgba(59,130,246,0.12)', padding: '4px 10px', borderRadius: 6,
-              border: '1px solid rgba(59,130,246,0.2)',
-              boxShadow: '0 0 10px rgba(59,130,246,0.15)',
-              animation: 'aiNoteTakerSoftGlow 3s infinite alternate'
-            }}>
-              <span className="ai-pulse-dot" style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: '#3b82f6', display: 'inline-block',
-                boxShadow: '0 0 8px #3b82f6'
-              }} />
-              🎙️ AI Note-Taker Active
+            <span className="flex items-center gap-1.5 text-blue-400 text-[10px] md:text-[11px] font-semibold bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)] animate-pulse flex-shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_#3b82f6]" />
+              🎙️ AI Active
             </span>
           )}
-          <span className="security-badge">
-            <span className="material-symbols-outlined" style={{ fontSize: 13, fontVariationSettings: "'FILL' 1" }}>verified_user</span>
-            Encrypted
+          
+          <span className="flex items-center gap-1 text-[#10B981] text-[10px] md:text-[11px] bg-[#10B981]/10 px-2 py-1 rounded-md border border-[#10B981]/20 font-medium flex-shrink-0">
+            <span className="material-symbols-outlined text-[12px] fill-current">verified_user</span>
+            Secure
           </span>
+          
           {/* WS indicator */}
-          <span style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            color: '#10B981', fontSize: 11, fontWeight: 600,
-            background: 'rgba(16,185,129,0.12)', padding: '4px 10px', borderRadius: 6,
-            border: '1px solid rgba(16,185,129,0.2)'
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: '#10B981', display: 'inline-block',
-            }} />
+          <span className="flex items-center gap-1.5 text-[#10B981] text-[10px] md:text-[11px] font-semibold bg-[#10B981]/10 px-2 py-1 rounded-md border border-[#10B981]/20 flex-shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
             Live
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600, fontFamily: 'monospace' }}>
+          
+          {/* Desktop/Tablet Timer */}
+          <span className="hidden md:inline text-white/60 text-xs font-semibold font-mono flex-shrink-0">
             {formatElapsed(elapsed)}
           </span>
         </div>
