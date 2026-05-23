@@ -6,6 +6,12 @@ A full-stack Zoom meeting platform clone built with **Next.js 15**, **FastAPI**,
 
 ---
 
+## Scalable SFU Based Zoom Architecture
+
+[![Scalable SFU Based Zoom Architecture Demo](https://img.shields.io/badge/Watch%20Demo%20on-Google%20Drive-blue?style=for-the-badge&logo=googledrive)](https://drive.google.com/file/d/1TD-tuMghStClISz1mPDEQ2XQcOaxjjVm/view?usp=sharing)
+
+---
+
 ## Architecture
 
 ```
