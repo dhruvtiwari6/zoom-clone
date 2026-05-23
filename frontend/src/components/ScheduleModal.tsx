@@ -204,7 +204,7 @@ export default function ScheduleModal({ isOpen, onClose, onSchedule }: ScheduleM
               <label htmlFor="schedule-desc">Description (optional)</label>
               <textarea id="schedule-desc" placeholder="Add a description for your meeting..." value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
-            <div className="form-row">
+            <div className="form-row grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="form-group">
                 <label htmlFor="schedule-date">Date</label>
                 <input id="schedule-date" type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} />

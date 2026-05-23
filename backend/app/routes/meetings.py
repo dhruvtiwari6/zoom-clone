@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -60,14 +60,31 @@ async def list_meetings(
     db: Prisma = Depends(get_db),
 ):
     """List all upcoming and recent meetings for a user."""
+    now = datetime.now(timezone.utc)
+    # Give a grace period of 6 hours for late starts
+    grace_limit = now - timedelta(hours=6)
+
     upcoming = await db.meeting.find_many(
-        where={"host_id": host_id, "status": {"in": ["scheduled", "active"]}},
+        where={
+            "host_id": host_id,
+            "status": {"in": ["active", "scheduled"]},
+            "scheduled_at": {"gte": grace_limit}
+        },
         order={"scheduled_at": "asc"},
         include={"host": True, "participants": True},
     )
     recent = await db.meeting.find_many(
-        where={"host_id": host_id, "status": "ended"},
-        order={"ended_at": "desc"},
+        where={
+            "host_id": host_id,
+            "OR": [
+                {"status": "ended"},
+                {
+                    "status": {"in": ["active", "scheduled"]},
+                    "scheduled_at": {"lt": grace_limit}
+                }
+            ]
+        },
+        order={"scheduled_at": "desc"},
         take=20,
         include={"host": True, "participants": True},
     )

@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: zoom-clone-backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
       - ./backend/.env
     volumes:
@@ -23,9 +23,9 @@ services:
     container_name: zoom-clone-livekit
     command: --dev --key-file /etc/livekit.keys --bind 0.0.0.0
     ports:
-      - "7880:7880"
-      - "7881:7881"
-      - "7882:7882/udp"
+      - "7890:7880"
+      - "7891:7881"
+      - "7892:7882/udp"
     volumes:
       - ./livekit.keys:/etc/livekit.keys
     restart: unless-stopped

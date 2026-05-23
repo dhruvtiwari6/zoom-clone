@@ -131,6 +131,11 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   const localPidRef = useRef<number | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const connectedTracksRef = useRef<Set<string>>(new Set());
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -139,6 +144,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
   const roomRef = useRef<Room | null>(null);
   const participantsRef = useRef<Participant[]>([]);
+  const joinInProgressRef = useRef<boolean>(false);
   const [remoteStreams, setRemoteStreams] = useState<Record<number, MediaStream>>({});
 
   // Synchronize participants state with participantsRef to prevent stale closure bugs
@@ -233,6 +239,23 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             const audioElement = track.attach();
             audioElement.autoplay = true;
             document.body.appendChild(audioElement);
+
+            // Connect remote participant track to mixer if we are host
+            if (audioCtxRef.current && audioDestRef.current && track.mediaStreamTrack) {
+              const trackId = track.sid || track.mediaStreamTrack.id;
+              if (!connectedTracksRef.current.has(trackId)) {
+                try {
+                  const ctx = audioCtxRef.current;
+                  const remoteStream = new MediaStream([track.mediaStreamTrack]);
+                  const source = ctx.createMediaStreamSource(remoteStream);
+                  source.connect(audioDestRef.current);
+                  connectedTracksRef.current.add(trackId);
+                  console.log(`[AI Note-Taker] Connected remote participant ${participant.identity} audio track to mixer`);
+                } catch (e) {
+                  console.error("[AI Note-Taker] Failed to connect remote audio source:", e);
+                }
+              }
+            }
           }
         });
 
@@ -255,6 +278,12 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             track.detach();
             const elements = track.attachedElements;
             elements.forEach(el => el.remove());
+
+            // Remove track from connected set
+            const trackId = track.sid || (track.mediaStreamTrack && track.mediaStreamTrack.id);
+            if (trackId) {
+              connectedTracksRef.current.delete(trackId);
+            }
           }
         });
 
@@ -394,6 +423,28 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             setLocalParticipantId(hostPart.id);
             setLocalDisplayName(hostPart.display_name);
             setHasJoined(true);
+          } else {
+            if (joinInProgressRef.current) {
+              setLoading(false);
+              return;
+            }
+            try {
+              joinInProgressRef.current = true;
+              const part = await api.joinMeeting(meetingId, {
+                display_name: 'Dhruv Tiwari',
+                user_id: data.host_id || 1,
+                passcode: data.passcode,
+              });
+              sessionStorage.setItem(`p_id_${meetingId}`, part.id.toString());
+              sessionStorage.setItem(`p_name_${meetingId}`, part.display_name);
+              setLocalParticipantId(part.id);
+              setLocalDisplayName(part.display_name);
+              setHasJoined(true);
+            } catch (e) {
+              console.error('Host auto-join error:', e);
+            } finally {
+              joinInProgressRef.current = false;
+            }
           }
           setLoading(false);
           return;
@@ -404,7 +455,12 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
         const queryName = urlParams.get('name');
         const queryPasscode = urlParams.get('passcode') || '';
         if (queryName) {
+          if (joinInProgressRef.current) {
+            setLoading(false);
+            return;
+          }
           try {
+            joinInProgressRef.current = true;
             const part = await api.joinMeeting(meetingId, {
               display_name: queryName,
               passcode: queryPasscode,
@@ -416,6 +472,8 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
             setHasJoined(true);
           } catch (e) {
             console.error('Auto-join error:', e);
+          } finally {
+            joinInProgressRef.current = false;
           }
           setLoading(false);
           return;
@@ -635,6 +693,36 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   // ── Actions ─────────────────────────────────────────────────────────────────
   const handleEndCall = useCallback(async () => {
     const isHost = participants.find(p => p.id === localParticipantId)?.role === 'host';
+    
+    // Stop recording and compile mixed audio blob if we are host
+    if (isHost && mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        showToast("AI Note-Taker: Finalizing summary...", "info");
+        const blob = await new Promise<Blob>((resolve) => {
+          mediaRecorderRef.current!.onstop = () => {
+            const finalBlob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
+            resolve(finalBlob);
+          };
+          mediaRecorderRef.current!.stop();
+        });
+
+        if (blob.size > 0) {
+          const formData = new FormData();
+          formData.append("file", blob, "meeting_recording.webm");
+          console.log("[AI Note-Taker] Dispatching mixed audio binary payload...");
+          
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+          await fetch(`${apiBase}/api/meetings/${meetingId}/transcribe`, {
+            method: 'POST',
+            body: formData,
+          });
+          showToast("AI Meeting Minutes processing initiated!", "success");
+        }
+      } catch (err) {
+        console.error("[AI Note-Taker] Recording upload failed:", err);
+      }
+    }
+
     try {
       if (isHost) {
         await api.updateMeeting(meetingId, { status: 'ended' });
@@ -778,6 +866,64 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
   const getInitials = (name: string) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const initAudioRecorder = useCallback(() => {
+    const isHost = participants.find(p => p.id === localParticipantId)?.role === 'host';
+    if (!isHost || !localStreamRef.current) return;
+    if (audioCtxRef.current) return; // already initialized
+
+    try {
+      console.log("[AI Note-Taker] Initializing Web Audio Mixer...");
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtxClass();
+      audioCtxRef.current = ctx;
+
+      const dest = ctx.createMediaStreamDestination();
+      audioDestRef.current = dest;
+
+      // Connect local mic track
+      const micTrack = localStreamRef.current.getAudioTracks()[0];
+      if (micTrack) {
+        const micStream = new MediaStream([micTrack]);
+        const source = ctx.createMediaStreamSource(micStream);
+        source.connect(dest);
+        console.log("[AI Note-Taker] Local mic track connected to Web Audio Mixer");
+      }
+
+      // Start MediaRecorder
+      const options = { mimeType: 'audio/webm;codecs=opus' };
+      let recorder: MediaRecorder;
+      if (MediaRecorder.isTypeSupported(options.mimeType)) {
+        recorder = new MediaRecorder(dest.stream, options);
+      } else {
+        recorder = new MediaRecorder(dest.stream);
+      }
+
+      mediaRecorderRef.current = recorder;
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstart = () => {
+        console.log("[AI Note-Taker] MediaRecorder started capturing mixed audio");
+      };
+
+      recorder.start(1000); // chunk every second
+    } catch (err) {
+      console.error("[AI Note-Taker] Failed to initialize Audio Context / Recorder:", err);
+    }
+  }, [participants, localParticipantId]);
+
+  useEffect(() => {
+    const isHost = participants.find(p => p.id === localParticipantId)?.role === 'host';
+    if (mediaReady && isHost) {
+      initAudioRecorder();
+    }
+  }, [mediaReady, participants, localParticipantId, initAudioRecorder]);
 
   const prevWaitingIdsRef = useRef<number[]>([]);
   useEffect(() => {
@@ -1031,7 +1177,17 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
     );
   }
 
-  const admittedParticipants = participants.filter(p => (p.role as string) !== 'waiting');
+  const admittedParticipants = participants.filter(p => {
+    if ((p.role as string) === 'waiting') return false;
+    // Filter out duplicate ghost host records that are not the active local or remote peer
+    if (p.role === 'host' && p.id !== localParticipantId) {
+      const hasLocalHost = participants.some(op => op.id === localParticipantId && op.role === 'host');
+      if (hasLocalHost && !remoteStreams[p.id]) {
+        return false;
+      }
+    }
+    return true;
+  });
   const waitingParticipants = participants.filter(p => (p.role as string) === 'waiting');
   const amHost = participants.find(p => p.id === localParticipantId)?.role === 'host';
 
@@ -1051,24 +1207,26 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
   return (
     <div className="meeting-room">
       {waitingNotice && (
-        <div style={{
-          position: 'absolute',
-          top: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 9999,
-          background: 'rgba(30, 41, 59, 0.95)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '16px',
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(20px)',
-          animation: 'slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-          minWidth: '380px'
-        }}>
+        <div 
+          className="w-[90%] sm:w-auto max-w-[420px] sm:min-w-[380px]"
+          style={{
+            position: 'absolute',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            background: 'rgba(30, 41, 59, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            padding: '12px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(20px)',
+            animation: 'slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
           <div style={{
             width: '40px',
             height: '40px',
@@ -1171,6 +1329,23 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           <span className="meeting-id-badge">{meetingId}</span>
         </div>
         <div className="header-controls">
+          {participants.find(p => p.id === localParticipantId)?.role === 'host' && (
+            <span className="ai-note-taker-badge" style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              color: '#3b82f6', fontSize: 11, fontWeight: 600,
+              background: 'rgba(59,130,246,0.12)', padding: '4px 10px', borderRadius: 6,
+              border: '1px solid rgba(59,130,246,0.2)',
+              boxShadow: '0 0 10px rgba(59,130,246,0.15)',
+              animation: 'aiNoteTakerSoftGlow 3s infinite alternate'
+            }}>
+              <span className="ai-pulse-dot" style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: '#3b82f6', display: 'inline-block',
+                boxShadow: '0 0 8px #3b82f6'
+              }} />
+              🎙️ AI Note-Taker Active
+            </span>
+          )}
           <span className="security-badge">
             <span className="material-symbols-outlined" style={{ fontSize: 13, fontVariationSettings: "'FILL' 1" }}>verified_user</span>
             Encrypted
@@ -1662,60 +1837,60 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
       </div>
 
       {/* Control Bar */}
-      <div className="control-bar">
-        <button className={`control-btn ${isMuted ? 'muted' : ''}`} onClick={handleToggleMute}>
+      <div className="control-bar flex justify-center items-center flex-wrap sm:flex-nowrap gap-1 sm:gap-2 px-2 sm:px-6 h-auto py-2 sm:h-16 sm:py-0">
+        <button className={`control-btn ${isMuted ? 'muted' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={handleToggleMute}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">{isMuted ? 'mic_off' : 'mic'}</span>
           </div>
-          <div className="ctrl-label">{isMuted ? 'Unmute' : 'Mute'}</div>
+          <div className="ctrl-label hidden sm:block">{isMuted ? 'Unmute' : 'Mute'}</div>
         </button>
-        <button className={`control-btn ${!isVideoOn ? 'muted' : ''}`} onClick={handleToggleVideo}>
+        <button className={`control-btn ${!isVideoOn ? 'muted' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={handleToggleVideo}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">{isVideoOn ? 'videocam' : 'videocam_off'}</span>
           </div>
-          <div className="ctrl-label">{isVideoOn ? 'Stop Video' : 'Start Video'}</div>
+          <div className="ctrl-label hidden sm:block">{isVideoOn ? 'Stop Video' : 'Start Video'}</div>
         </button>
 
-        <div className="control-divider"></div>
+        <div className="control-divider hidden sm:block"></div>
 
-        <button className={`control-btn ${showParticipants ? 'active' : ''}`} onClick={() => { setShowParticipants(!showParticipants); setShowChat(false); setShowInvite(false); }}>
+        <button className={`control-btn ${showParticipants ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => { setShowParticipants(!showParticipants); setShowChat(false); setShowInvite(false); }}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">group</span>
           </div>
-          <div className="ctrl-label">Participants ({participants.length})</div>
+          <div className="ctrl-label hidden sm:block">Participants ({participants.length})</div>
         </button>
-        <button className={`control-btn ${showChat ? 'active' : ''}`} onClick={() => { setShowChat(!showChat); setShowParticipants(false); setShowInvite(false); }}>
+        <button className={`control-btn ${showChat ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => { setShowChat(!showChat); setShowParticipants(false); setShowInvite(false); }}>
           <div className="ctrl-icon" style={{ position: 'relative' }}>
             <span className="material-symbols-outlined" style={{ fontVariationSettings: showChat ? "'FILL' 1" : "'FILL' 0" }}>chat</span>
             {unreadMessagesCount > 0 && (
               <span className="chat-badge">{unreadMessagesCount}</span>
             )}
           </div>
-          <div className="ctrl-label">Chat</div>
+          <div className="ctrl-label hidden sm:block">Chat</div>
         </button>
-        <button className={`control-btn ${isScreenSharing ? 'screen-sharing' : ''}`} onClick={handleScreenShare}>
+        <button className={`control-btn ${isScreenSharing ? 'screen-sharing' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={handleScreenShare}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined" style={{ color: isScreenSharing ? '#10B981' : 'inherit' }}>screen_share</span>
           </div>
-          <div className="ctrl-label">{isScreenSharing ? 'Stop Share' : 'Share Screen'}</div>
+          <div className="ctrl-label hidden sm:block">{isScreenSharing ? 'Stop Share' : 'Share Screen'}</div>
         </button>
-        <button className={`control-btn ${showReactionBar ? 'active' : ''}`} onClick={() => setShowReactionBar(r => !r)}>
+        <button className={`control-btn ${showReactionBar ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => setShowReactionBar(r => !r)}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">add_reaction</span>
           </div>
-          <div className="ctrl-label">React</div>
+          <div className="ctrl-label hidden sm:block">React</div>
         </button>
-        <button className={`control-btn ${showInvite ? 'active' : ''}`} onClick={() => { setShowInvite(!showInvite); setShowChat(false); setShowParticipants(false); }}>
+        <button className={`control-btn ${showInvite ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => { setShowInvite(!showInvite); setShowChat(false); setShowParticipants(false); }}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">link</span>
           </div>
-          <div className="ctrl-label">Invite</div>
+          <div className="ctrl-label hidden sm:block">Invite</div>
         </button>
 
-        <div className="control-divider"></div>
+        <div className="control-divider hidden sm:block"></div>
 
-        <button className="control-btn end-call" onClick={handleEndCall}>
-          <div className="ctrl-label">{amHost ? 'End' : 'Leave'}</div>
+        <button className="control-btn end-call px-3 sm:px-5 h-8 sm:h-9 flex items-center justify-center min-w-max" onClick={handleEndCall}>
+          <div className="ctrl-label text-xs sm:text-sm">{amHost ? 'End' : 'Leave'}</div>
         </button>
       </div>
     </div>

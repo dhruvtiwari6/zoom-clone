@@ -9,7 +9,7 @@ interface ActionCardsProps {
 
 export default function ActionCards({ onNewMeeting, onJoinMeeting, onSchedule }: ActionCardsProps) {
   return (
-    <div className="workplace-actions-row">
+    <div className="workplace-actions-row flex gap-4 sm:gap-9 justify-center flex-wrap sm:flex-nowrap">
       {/* New Meeting Button */}
       <div className="action-circle-container" onClick={onNewMeeting} id="btn-new-meeting">
         <div className="action-circle orange">

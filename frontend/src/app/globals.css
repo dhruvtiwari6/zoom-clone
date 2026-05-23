@@ -1,6 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --zoom-blue: #0B5CFF;
   --zoom-blue-hover: #0046CC;
@@ -236,7 +240,14 @@ body {
   padding:6px 16px; font-size:12px; font-weight:700; cursor:pointer;
   transition:var(--transition); box-shadow:0 2px 6px rgba(11,92,255,0.15);
 }
-.btn-start-meeting:hover { background:#0046CC; }
+.btn-start-meeting:hover:not(:disabled) { background:#0046CC; }
+.btn-start-meeting:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 /* Form controls / cards backup */
 .action-card.orange:hover { background:var(--zoom-orange-hover); box-shadow:0 8px 25px rgba(242,109,33,0.3); }
@@ -1371,5 +1382,24 @@ body {
   to {
     transform: translate(-50%, 0);
     opacity: 1;
+  }
+}
+
+@keyframes aiPulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 8px #3b82f6; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}
+.ai-pulse-dot {
+  animation: aiPulse 2s infinite ease-in-out;
+}
+@keyframes aiNoteTakerSoftGlow {
+  from {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.2);
+  }
+  to {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.35);
+    border-color: rgba(59, 130, 246, 0.4);
   }
 }

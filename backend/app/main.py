@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import db
-from app.routes import meetings, participants
+from app.routes import meetings, participants, transcriptions
 from app.seed import seed
 from app.websocket_manager import manager
 
@@ -47,6 +47,7 @@ app.add_middleware(
 # Include routers
 app.include_router(meetings.router)
 app.include_router(participants.router)
+app.include_router(transcriptions.router)
 
 
 @app.get("/api/health")

@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     LIVEKIT_API_SECRET: str = "devsecretdevsecretdevsecretdevsecretdevsecret"
     LIVEKIT_WS_URL: str = "ws://localhost:7880"
 
+    GROQ_API_KEY: str = ""
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -13,6 +13,14 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'recent'>('upcoming');
 
+  const isStartPossible = (m: Meeting) => {
+    if (m.status === 'active') return true;
+    if (!m.scheduled_at) return true;
+    const startTime = new Date(m.scheduled_at).getTime();
+    const now = Date.now();
+    return now >= startTime - 15 * 60 * 1000;
+  };
+
   const getTodayDateStr = () => {
     const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' };
     return new Date().toLocaleDateString('en-US', options);
@@ -58,6 +66,7 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
   };
 
   const handleStart = (meetingId: string) => {
+    sessionStorage.setItem(`host_of_${meetingId}`, 'true');
     router.push(`/meeting/${meetingId}`);
   };
 
@@ -122,7 +131,7 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
           onClick={() => setActiveTab('recent')}
         >
           <span className="material-symbols-outlined tab-icon">history</span>
-          Recent ({recent.length})
+          Previous ({recent.length})
         </button>
       </div>
 
@@ -131,7 +140,7 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
         {activeTab === 'upcoming' ? (
           upcoming.length > 0 ? (
             upcoming.map((m, index) => (
-              <div className="workplace-meeting-item" key={m.meeting_id || index}>
+              <div className="workplace-meeting-item flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0" key={m.meeting_id || index}>
                 <div className="meeting-item-details">
                   <div className="meeting-item-title-row">
                     <span className="meeting-item-title">{m.title || 'My Meeting'}</span>
@@ -144,7 +153,7 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
                     Host: {m.host?.name || 'dhruv tiwari'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:justify-start mt-2 sm:mt-0">
                   <a 
                     className="btn-add-calendar" 
                     href={getGoogleCalendarUrl(m)} 
@@ -176,7 +185,12 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>calendar_month</span>
                   </a>
-                  <button className="btn-start-meeting" onClick={() => handleStart(m.meeting_id)}>
+                  <button 
+                    className="btn-start-meeting" 
+                    onClick={() => handleStart(m.meeting_id)}
+                    disabled={!isStartPossible(m)}
+                    title={!isStartPossible(m) ? "Starting is only enabled up to 15 minutes before the scheduled time" : "Start meeting"}
+                  >
                     Start
                   </button>
                 </div>
@@ -192,7 +206,7 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
         ) : (
           recent.length > 0 ? (
             recent.map((m, index) => (
-              <div className="workplace-meeting-item" key={m.meeting_id || index}>
+              <div className="workplace-meeting-item flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0" key={m.meeting_id || index}>
                 <div className="meeting-item-details">
                   <div className="meeting-item-title-row">
                     <span className="meeting-item-title">{m.title || 'My Meeting'}</span>
@@ -205,15 +219,17 @@ export default function MeetingList({ upcoming, recent, onRefresh }: MeetingList
                     Host: {m.host?.name || 'dhruv tiwari'}
                   </div>
                 </div>
-                <button className="btn-rejoin-meeting" onClick={() => handleStart(m.meeting_id)}>
-                  Rejoin
-                </button>
+                <div className="w-full sm:w-auto flex justify-end mt-2 sm:mt-0">
+                  <button className="btn-rejoin-meeting" onClick={() => handleStart(m.meeting_id)}>
+                    Rejoin
+                  </button>
+                </div>
               </div>
             ))
           ) : (
             <div className="empty-meetings-state">
               <span className="material-symbols-outlined empty-icon">history_toggle_off</span>
-              <p className="empty-title">No recent meetings</p>
+              <p className="empty-title">No previous meetings</p>
               <p className="empty-subtitle">Completed meetings will appear here.</p>
             </div>
           )
