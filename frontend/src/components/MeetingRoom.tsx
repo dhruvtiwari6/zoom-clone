@@ -1823,14 +1823,14 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
       </div>
 
       {/* Control Bar */}
-      <div className="control-bar flex justify-center items-center flex-wrap sm:flex-nowrap gap-1 sm:gap-2 px-2 sm:px-6 h-auto py-2 sm:h-16 sm:py-0">
-        <button className={`control-btn ${isMuted ? 'muted' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={handleToggleMute}>
+      <div className="control-bar flex justify-start sm:justify-center items-center gap-1 sm:gap-2 px-2 sm:px-6 h-14 sm:h-16 flex-shrink-0 w-full overflow-x-auto no-scrollbar">
+        <button className={`control-btn ${isMuted ? 'muted' : ''} min-w-[40px] sm:min-w-[68px] p-1 sm:p-2 flex-shrink-0`} onClick={handleToggleMute}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">{isMuted ? 'mic_off' : 'mic'}</span>
           </div>
           <div className="ctrl-label hidden sm:block">{isMuted ? 'Unmute' : 'Mute'}</div>
         </button>
-        <button className={`control-btn ${!isVideoOn ? 'muted' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={handleToggleVideo}>
+        <button className={`control-btn ${!isVideoOn ? 'muted' : ''} min-w-[40px] sm:min-w-[68px] p-1 sm:p-2 flex-shrink-0`} onClick={handleToggleVideo}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">{isVideoOn ? 'videocam' : 'videocam_off'}</span>
           </div>
@@ -1839,13 +1839,13 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
         <div className="control-divider hidden sm:block"></div>
 
-        <button className={`control-btn ${showParticipants ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => { setShowParticipants(!showParticipants); setShowChat(false); setShowInvite(false); }}>
+        <button className={`control-btn ${showParticipants ? 'active' : ''} min-w-[40px] sm:min-w-[68px] p-1 sm:p-2 flex-shrink-0`} onClick={() => { setShowParticipants(!showParticipants); setShowChat(false); setShowInvite(false); }}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">group</span>
           </div>
           <div className="ctrl-label hidden sm:block">Participants ({participants.length})</div>
         </button>
-        <button className={`control-btn ${showChat ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => { setShowChat(!showChat); setShowParticipants(false); setShowInvite(false); }}>
+        <button className={`control-btn ${showChat ? 'active' : ''} min-w-[40px] sm:min-w-[68px] p-1 sm:p-2 flex-shrink-0`} onClick={() => { setShowChat(!showChat); setShowParticipants(false); setShowInvite(false); }}>
           <div className="ctrl-icon" style={{ position: 'relative' }}>
             <span className="material-symbols-outlined" style={{ fontVariationSettings: showChat ? "'FILL' 1" : "'FILL' 0" }}>chat</span>
             {unreadMessagesCount > 0 && (
@@ -1854,19 +1854,19 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
           </div>
           <div className="ctrl-label hidden sm:block">Chat</div>
         </button>
-        <button className={`control-btn ${isScreenSharing ? 'screen-sharing' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={handleScreenShare}>
+        <button className={`control-btn ${isScreenSharing ? 'screen-sharing' : ''} min-w-[40px] sm:min-w-[68px] p-1 sm:p-2 flex-shrink-0`} onClick={handleScreenShare}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined" style={{ color: isScreenSharing ? '#10B981' : 'inherit' }}>screen_share</span>
           </div>
           <div className="ctrl-label hidden sm:block">{isScreenSharing ? 'Stop Share' : 'Share Screen'}</div>
         </button>
-        <button className={`control-btn ${showReactionBar ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => setShowReactionBar(r => !r)}>
+        <button className={`control-btn ${showReactionBar ? 'active' : ''} min-w-[40px] sm:min-w-[68px] p-1 sm:p-2 flex-shrink-0`} onClick={() => setShowReactionBar(r => !r)}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">add_reaction</span>
           </div>
           <div className="ctrl-label hidden sm:block">React</div>
         </button>
-        <button className={`control-btn ${showInvite ? 'active' : ''} min-w-[50px] sm:min-w-[68px] p-1 sm:p-2`} onClick={() => { setShowInvite(!showInvite); setShowChat(false); setShowParticipants(false); }}>
+        <button className={`control-btn ${showInvite ? 'active' : ''} min-w-[40px] sm:min-w-[68px] p-1 sm:p-2 flex-shrink-0`} onClick={() => { setShowInvite(!showInvite); setShowChat(false); setShowParticipants(false); }}>
           <div className="ctrl-icon">
             <span className="material-symbols-outlined">link</span>
           </div>
@@ -1875,7 +1875,7 @@ export default function MeetingRoom({ meetingId }: MeetingRoomProps) {
 
         <div className="control-divider hidden sm:block"></div>
 
-        <button className="control-btn end-call px-3 sm:px-5 h-8 sm:h-9 flex items-center justify-center min-w-max" onClick={handleEndCall}>
+        <button className="control-btn end-call px-3 sm:px-5 h-8 sm:h-9 flex items-center justify-center min-w-max flex-shrink-0" onClick={handleEndCall}>
           <div className="ctrl-label text-xs sm:text-sm">{amHost ? 'End' : 'Leave'}</div>
         </button>
       </div>
