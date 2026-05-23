@@ -1,18 +1,18 @@
 # Zoom Clone — Video Conferencing Platform
 
-A full-stack Zoom meeting platform clone built with **Next.js 15**, **FastAPI**, and **PostgreSQL (Neon DB)**. Replicates Zoom's design, user experience, and core meeting workflows.
+A full-stack Zoom meeting platform clone built with **Next.js 15**, **FastAPI**, and **SQLite Database**. Replicates Zoom's design, user experience, and core meeting workflows.
 
-![Tech Stack](https://img.shields.io/badge/Next.js-15-black) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-blue) ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
+![Tech Stack](https://img.shields.io/badge/Next.js-15-black) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688) ![SQLite](https://img.shields.io/badge/SQLite-Database-blue) ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐     HTTP REST     ┌──────────────────┐     asyncpg     ┌─────────────┐
-│   Next.js 15    │ ◄──────────────► │   FastAPI        │ ◄────────────► │  Neon DB     │
-│   (React 19)    │   localhost:3000  │   (Uvicorn)      │  localhost:8000 │  (PostgreSQL)│
-│   App Router    │                  │   Docker         │                │  Cloud       │
+┌─────────────────┐     HTTP REST     ┌──────────────────┐     aiosqlite   ┌─────────────┐
+│   Next.js 15    │ ◄──────────────► │   FastAPI        │ ◄────────────► │  SQLite DB  │
+│   (React 19)    │   localhost:3000  │   (Uvicorn)      │  localhost:8000 │  (Local DB) │
+│   App Router    │                  │   Docker         │                │             │
 └─────────────────┘                  └──────────────────┘                └─────────────┘
 ```
 
@@ -22,7 +22,7 @@ A full-stack Zoom meeting platform clone built with **Next.js 15**, **FastAPI**,
 |-----------------|-------------------------------|----------------------------------------------|
 | **Frontend**    | Next.js 15, React 19, TS      | App Router, vanilla CSS, client components   |
 | **Backend**     | Python 3.12, FastAPI, Uvicorn | Async endpoints, Pydantic validation         |
-| **Database**    | PostgreSQL via Neon DB        | SQLAlchemy async ORM, auto-migration         |
+| **Database**    | SQLite Database               | SQLAlchemy async ORM (aiosqlite)             |
 | **Container**   | Docker + Docker Compose       | Backend containerized with hot-reload        |
 
 ## Database Schema
@@ -73,7 +73,6 @@ A full-stack Zoom meeting platform clone built with **Next.js 15**, **FastAPI**,
 ### Prerequisites
 - **Node.js** ≥ 18
 - **Docker** & **Docker Compose**
-- **Neon DB** account (free tier at [neon.tech](https://neon.tech))
 
 ### 1. Clone & Configure
 
@@ -85,14 +84,13 @@ cd zoom-clone
 ### 2. Setup Backend
 
 ```bash
-# Copy env and add your Neon DB connection string
+# Copy env and configure settings
 cp backend/.env.example backend/.env
-# Edit backend/.env with your DATABASE_URL
 ```
 
 **Example `.env`:**
 ```
-DATABASE_URL=postgresql+asyncpg://username:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=sqlite+aiosqlite:///./zoom_clone.db
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -142,7 +140,7 @@ The app will be available at `http://localhost:3000`.
 1. **No Login Required** — A default user ("Dhruv Tiwari", ID=1) is assumed logged in
 2. **Simulated Video** — Meeting room uses avatar placeholders (no WebRTC)
 3. **Single Server** — No real-time sync between participants (simulated participants)
-4. **Neon DB** — PostgreSQL hosted on Neon (replace with any PostgreSQL instance)
+4. **SQLite Database** — Fully self-contained, light, local database (`zoom_clone.db`)
 5. **Sample Data** — Database is auto-seeded with 3 upcoming and 5 recent meetings
 
 ## Project Structure
